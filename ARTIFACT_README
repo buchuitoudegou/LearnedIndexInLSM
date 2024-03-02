@@ -1,0 +1,45 @@
+Artifacts of Paper #1644, VLDB 2024
+
+All our source data used in paper have been packed and uploaded to: [Google Drive](https://drive.google.com/file/d/1TC8au9E8P6PlPLcoGnJeDLpYQjH2sVYh/view?usp=drive_link).
+Along with a dataset generate code modified from YCSB-Gen, at [Github](https://github.com/mengshichen-18/DataGenerator)
+You can directly download them to your machine and follow the instructions in the dataset generator repo to get all our data,
+then modify the corresponding dataset path in our benchmark scripts, 
+or you can generate them easily with our data description by YCSB-C at https://github.com/basicthinker/YCSB-C.
+
+All our experienments shown in paper can be reproduced by four scripts in ./benchmark_scripts.
+1. exp_pointquery.sh corresponds to the experiments reported in Fig 5 to Fig 9 in the paper
+2. exp_range.sh corresponds to Fig 10
+3. exp_dist.sh corresponds to Fig 11
+4. exp_ycsb.sh corresponds to Fig 12, however, since this experiment is quite time consuming (usually taking days), we only activate the experiments in Longlat dataset in the script, which is representative. You can uncomment the rest experiments.
+
+These scripts, once run, will write the results into ./evaluation and create a .out file for each experiment.
+This output file is further used in plot scripts.
+
+We also included four plotting scripts in ./benchmarking_plotting.
+They will output the main figures showing eperimental results in our paper.
+
+To install and launch this set of code, here are some instructions after you cloned this repo:
+
+```
+mkdir build
+mkdir evaluation
+cd build
+cmake /PATH/TO/THIS/REPO -DCMAKE_BUILD_TYPE=RELEASE -DNDEBUG_SWITCH=ON
+make -j
+cd ~
+```
+
+Instructions in more detail if you want to do single testing by yourself:
+
+If you want to run any of the single tests by yourself, please use the application "read_cold".
+This is also what we use during the experiments. Some of the important options is listed below.
+For a full option list, please use --help option. 
+
+-m: running mode. We keep a Wisckey baseline mode inside the library as well for ease of testing.
+    "-m 8" is Wisckey and "-m 7" is our learned LSM system.
+-f: the path to the dataset. The dataset file should contain one key per line.
+-r: the path to the requests. The workload file should contain one key per line.
+-d: the path to the database. If with "-w" mode, this directory will be created or cleaned if
+    already exists.
+-k, -v: the size of keys and values, in bytes.
+
