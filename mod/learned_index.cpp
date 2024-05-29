@@ -373,7 +373,7 @@ bool LearnedIndexData::Learn(string filename) {
     // for(int i=0; i<count; i++){
     //   bulk_load_data_.push_back(std::make_pair(stoll(string_keys[i].first), i));
     // }
-    if(count<4096){
+    if(count<8192){
       learned.store(false);
       return false;
   } 
@@ -681,30 +681,68 @@ void LearnedIndexData::ReadModel(const string& filename) {
   //     std::cout << "Unable to open file";
   // }
   if(adgMod::modelmode == 0){
-    std::ifstream input_file(filename);
-    // std::cout<<"Reading model: "<<filename<<std::endl;
 
+    std::ifstream input_file(filename, std::ios::binary | std::ios::ate);
     if (!input_file.good()) return;
 
-    input_file >> adgMod::block_num_entries >> adgMod::block_size >>
-        adgMod::entry_size;
-    while (true) {
-      string x;
-      double k, b;
-      input_file >> x;
-      // std::cout<<x<<std::endl;
-      if (x == "StartAcc") break;
-      input_file >> k >> b;
-      string_segments.emplace_back(atoll(x.c_str()), k, b);
+    // 获取文件大小
+    std::streamsize file_size = input_file.tellg();
+    input_file.seekg(0, std::ios::beg);
+
+    // 分配缓冲区并一次性读取整个文件
+    std::vector<char> buffer(file_size);
+    if (!input_file.read(buffer.data(), file_size)) {
+        return; // 读取失败
     }
-    input_file >> min_key >> max_key >> size >> level >> cost;
+
+    // 在内存中解析缓冲区数据
+    std::istringstream in(std::string(buffer.data(), buffer.size()));
+
+    // 读取数据
+    in >> adgMod::block_num_entries >> adgMod::block_size >> adgMod::entry_size;
+
+    while (true) {
+        std::string x;
+        double k, b;
+        in >> x;
+        if (x == "StartAcc") break;
+        in >> k >> b;
+        string_segments.emplace_back(std::stoll(x), k, b);
+    }
+
+    in >> min_key >> max_key >> size >> level >> cost;
+
     // testing num entires
     // while (true) {
     //   uint64_t first;
-    //   string second;
-    //   if (!(input_file >> first >> second)) break;
+    //   std::string second;
+    //   if (!(in >> first >> second)) break;
     //   num_entries_accumulated.Add(first, std::move(second));
     // }
+    // std::ifstream input_file(filename);
+    // // std::cout<<"Reading model: "<<filename<<std::endl;
+
+    // if (!input_file.good()) return;
+
+    // input_file >> adgMod::block_num_entries >> adgMod::block_size >>
+    //     adgMod::entry_size;
+    // while (true) {
+    //   string x;
+    //   double k, b;
+    //   input_file >> x;
+    //   // std::cout<<x<<std::endl;
+    //   if (x == "StartAcc") break;
+    //   input_file >> k >> b;
+    //   string_segments.emplace_back(atoll(x.c_str()), k, b);
+    // }
+    // input_file >> min_key >> max_key >> size >> level >> cost;
+    // // testing num entires
+    // // while (true) {
+    // //   uint64_t first;
+    // //   string second;
+    // //   if (!(input_file >> first >> second)) break;
+    // //   num_entries_accumulated.Add(first, std::move(second));
+    // // }
   }
   else if(adgMod::modelmode == 1){
     std::ifstream input_file(filename);
@@ -740,24 +778,71 @@ void LearnedIndexData::ReadModel(const string& filename) {
   }
   else if(adgMod::modelmode == 5){
 
-    std::ifstream input_file(filename);
+    std::ifstream input_file(filename, std::ios::binary | std::ios::ate);
     if (!input_file.good()) return;
-    std::string fileContent;
-    fileContent = string((std::istreambuf_iterator<char>(input_file)),
-                  std::istreambuf_iterator<char>());
+
+    // 获取文件大小
+    std::streamsize fileSize = input_file.tellg();
+    input_file.seekg(0, std::ios::beg);
+
+    // 创建一个缓冲区来存储整个文件内容
+    std::vector<char> buffer(fileSize);
+
+    // 读取整个文件到缓冲区
+    if (!input_file.read(buffer.data(), fileSize)) {
+        std::cerr << "Error reading file!" << std::endl;
+        return;
+    }
+
     input_file.close();
+
+    // 将缓冲区内容转换为字符串
+    std::string fileContent(buffer.begin(), buffer.end());
+
+    // 反序列化
     rs::Serializer<long long int> serializer;
     const auto rs_deserialized = serializer.FromBytes(fileContent);
     rs = rs_deserialized;
+
+    // std::ifstream input_file(filename);
+    // if (!input_file.good()) return;
+    // std::string fileContent;
+    // fileContent = string((std::istreambuf_iterator<char>(input_file)),
+    //               std::istreambuf_iterator<char>());
+    // input_file.close();
+    // rs::Serializer<long long int> serializer;
+    // const auto rs_deserialized = serializer.FromBytes(fileContent);
+    // rs = rs_deserialized;
   }
   else if(adgMod::modelmode == 6){
 
-    std::ifstream input_file(filename);
+    std::ifstream input_file(filename, std::ios::binary | std::ios::ate);
     if (!input_file.good()) return;
-    std::string fileContent;
-    fileContent = string((std::istreambuf_iterator<char>(input_file)),
-                  std::istreambuf_iterator<char>());
+
+    // 获取文件大小
+    std::streamsize fileSize = input_file.tellg();
+    input_file.seekg(0, std::ios::beg);
+
+    // 创建一个缓冲区来存储整个文件内容
+    std::vector<char> buffer(fileSize);
+
+    // 读取整个文件到缓冲区
+    if (!input_file.read(buffer.data(), fileSize)) {
+        std::cerr << "Error reading file!" << std::endl;
+        return;
+    }
+
     input_file.close();
+
+    // 将缓冲区内容转换为字符串
+    std::string fileContent(buffer.begin(), buffer.end());
+
+    // std::ifstream input_file(filename);
+    // if (!input_file.good()) return;
+    // std::string fileContent;
+    // fileContent = string((std::istreambuf_iterator<char>(input_file)),
+    //               std::istreambuf_iterator<char>());
+    // input_file.close();
     ts::Serializer<long long int> serializer;
     const auto rs_deserialized = serializer.FromBytes(fileContent);
     ts = rs_deserialized;

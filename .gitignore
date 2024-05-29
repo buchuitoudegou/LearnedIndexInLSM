@@ -9,3 +9,4 @@ cmake-*
 # Build directory.
 build/
 out/
+evaluation/

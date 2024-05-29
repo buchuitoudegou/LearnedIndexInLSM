@@ -823,16 +823,68 @@ private:
 
     //mapping file to memory
     static K *map_file(const std::string &in_filename, size_t file_bytes) {
-        auto fd = open(in_filename.c_str(), O_RDONLY);
-        if (fd == -1)
-            throw std::runtime_error("Open file error" + std::string(strerror(errno)));
 
-        auto data = (K *) mmap(nullptr, file_bytes, PROT_READ, MAP_SHARED, fd, 0);
-        if (data == MAP_FAILED)
-            throw std::runtime_error("mmap error" + std::string(strerror(errno)));
-        if (madvise(data, file_bytes, MADV_WILLNEED) == -1)
-            throw std::runtime_error("madvise error" + std::string(strerror(errno)));
-        return data;
+        std::ifstream input_file(in_filename, std::ios::binary | std::ios::ate);
+        if (!input_file) {
+            throw std::runtime_error("Open file error: " + in_filename);
+        }
+
+        // 获取文件大小
+        file_bytes = input_file.tellg();
+        input_file.seekg(0, std::ios::beg);
+
+        // 分配缓冲区并一次性读取整个文件
+        K* buffer = new K[file_bytes / sizeof(K)];
+        if (!input_file.read(reinterpret_cast<char*>(buffer), file_bytes)) {
+            delete[] buffer;
+            throw std::runtime_error("Read file error: " + in_filename);
+        }
+
+        return buffer;
+
+
+
+        // Map and Load method - one IO
+        // // 打开文件
+        // auto fd = open(in_filename.c_str(), O_RDONLY);
+        // if (fd == -1)
+        //     throw std::runtime_error("Open file error: " + std::string(strerror(errno)));
+
+        // // 使用 mmap 映射文件
+        // auto data = (K *) mmap(nullptr, file_bytes, PROT_READ, MAP_SHARED, fd, 0);
+        // if (data == MAP_FAILED) {
+        //     close(fd);
+        //     throw std::runtime_error("mmap error: " + std::string(strerror(errno)));
+        // }
+
+        // // 提示操作系统将数据预加载到内存
+        // if (madvise(data, file_bytes, MADV_WILLNEED) == -1) {
+        //     munmap(data, file_bytes);
+        //     close(fd);
+        //     throw std::runtime_error("madvise error: " + std::string(strerror(errno)));
+        // }
+
+        // // 分配缓冲区并将映射的数据复制到缓冲区中
+        // K *buffer = new K[file_bytes / sizeof(K)];
+        // std::memcpy(buffer, data, file_bytes);
+
+        // // 释放 mmap 映射
+        // munmap(data, file_bytes);
+        // close(fd);
+
+        // return buffer;
+
+        // Original Method
+        // auto fd = open(in_filename.c_str(), O_RDONLY);
+        // if (fd == -1)
+        //     throw std::runtime_error("Open file error" + std::string(strerror(errno)));
+
+        // auto data = (K *) mmap(nullptr, file_bytes, PROT_READ, MAP_SHARED, fd, 0);
+        // if (data == MAP_FAILED)
+        //     throw std::runtime_error("mmap error" + std::string(strerror(errno)));
+        // if (madvise(data, file_bytes, MADV_WILLNEED) == -1)
+        //     throw std::runtime_error("madvise error" + std::string(strerror(errno)));
+        // return data;
     }
 
     static void unmap_file(K *data, size_t file_bytes) {

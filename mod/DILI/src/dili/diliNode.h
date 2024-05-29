@@ -534,43 +534,107 @@ struct diliNode{
 
     }
 
-    void load(FILE *fp) {
-        fread(&meta_info, sizeof(int), 1, fp);
-        fread(&a, sizeof(double), 1, fp);
-        fread(&b, sizeof(double), 1, fp);
-        fread(&fanout, sizeof(int), 1, fp);
-        assert(fanout > 0);
+void load(FILE *fp) {
+    // 获取文件大小
+    fseek(fp, 0, SEEK_END);
+    long file_size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
 
-        fread(&num_nonempty, sizeof(int), 1, fp);
-        fread(&avg_n_travs_since_last_dist, sizeof(double), 1, fp);
-        fread(&total_n_travs, sizeof(long), 1, fp);
+    // 分配缓冲区并一次性读取整个文件
+    std::vector<char> buffer(file_size);
+    fread(buffer.data(), sizeof(char), file_size, fp);
 
+    // 使用缓冲区解析数据
+    const char* data_ptr = buffer.data();
+    load_from_buffer(data_ptr);
+}
 
-        fread(&last_total_n_travs, sizeof(long), 1, fp);
-        fread(&last_nn, sizeof(int), 1, fp);
-        fread(&n_adjust, sizeof(int), 1, fp);
+void load_from_buffer(const char*& data_ptr) {
+    std::memcpy(&meta_info, data_ptr, sizeof(int));
+    data_ptr += sizeof(int);
+    std::memcpy(&a, data_ptr, sizeof(double));
+    data_ptr += sizeof(double);
+    std::memcpy(&b, data_ptr, sizeof(double));
+    data_ptr += sizeof(double);
+    std::memcpy(&fanout, data_ptr, sizeof(int));
+    data_ptr += sizeof(int);
+    assert(fanout > 0);
 
-        pe_data = new pairEntry[fanout];
-        keyType key = 0;
-        recordPtr ptr = 0;
-        for (int i = 0; i < fanout; ++i) {
-            fread(&key, sizeof(keyType), 1, fp);
-            if (key >= 0) {
-                fread(&ptr, sizeof(recordPtr), 1, fp);
-                pe_data[i].assign(key, ptr);
-            } else if (key == -1){
-                diliNode *child = new diliNode(false);
-                child->load(fp);
-                pe_data[i].setChild(child);
-            } else if (key == -2) {
-                fan2Leaf *fan2child = new fan2Leaf;
-                fan2child->load(fp);
-                pe_data[i].setFan2Child(fan2child);
-            } else {
-                pe_data[i].setNull();
-            }
+    std::memcpy(&num_nonempty, data_ptr, sizeof(int));
+    data_ptr += sizeof(int);
+    std::memcpy(&avg_n_travs_since_last_dist, data_ptr, sizeof(double));
+    data_ptr += sizeof(double);
+    std::memcpy(&total_n_travs, data_ptr, sizeof(long));
+    data_ptr += sizeof(long);
+
+    std::memcpy(&last_total_n_travs, data_ptr, sizeof(long));
+    data_ptr += sizeof(long);
+    std::memcpy(&last_nn, data_ptr, sizeof(int));
+    data_ptr += sizeof(int);
+    std::memcpy(&n_adjust, data_ptr, sizeof(int));
+    data_ptr += sizeof(int);
+
+    pe_data = new pairEntry[fanout];
+    keyType key = 0;
+    recordPtr ptr = 0;
+    for (int i = 0; i < fanout; ++i) {
+        std::memcpy(&key, data_ptr, sizeof(keyType));
+        data_ptr += sizeof(keyType);
+        if (key >= 0) {
+            std::memcpy(&ptr, data_ptr, sizeof(recordPtr));
+            data_ptr += sizeof(recordPtr);
+            pe_data[i].assign(key, ptr);
+        } else if (key == -1) {
+            diliNode *child = new diliNode(false);
+            child->load_from_buffer(data_ptr); // 递归调用
+            pe_data[i].setChild(child);
+        } else if (key == -2) {
+            fan2Leaf *fan2child = new fan2Leaf;
+            fan2child->load_from_buffer(data_ptr); // 递归调用
+            pe_data[i].setFan2Child(fan2child);
+        } else {
+            pe_data[i].setNull();
         }
     }
+}
+
+    // void load(FILE *fp) {
+    //     fread(&meta_info, sizeof(int), 1, fp);
+    //     fread(&a, sizeof(double), 1, fp);
+    //     fread(&b, sizeof(double), 1, fp);
+    //     fread(&fanout, sizeof(int), 1, fp);
+    //     assert(fanout > 0);
+
+    //     fread(&num_nonempty, sizeof(int), 1, fp);
+    //     fread(&avg_n_travs_since_last_dist, sizeof(double), 1, fp);
+    //     fread(&total_n_travs, sizeof(long), 1, fp);
+
+
+    //     fread(&last_total_n_travs, sizeof(long), 1, fp);
+    //     fread(&last_nn, sizeof(int), 1, fp);
+    //     fread(&n_adjust, sizeof(int), 1, fp);
+
+    //     pe_data = new pairEntry[fanout];
+    //     keyType key = 0;
+    //     recordPtr ptr = 0;
+    //     for (int i = 0; i < fanout; ++i) {
+    //         fread(&key, sizeof(keyType), 1, fp);
+    //         if (key >= 0) {
+    //             fread(&ptr, sizeof(recordPtr), 1, fp);
+    //             pe_data[i].assign(key, ptr);
+    //         } else if (key == -1){
+    //             diliNode *child = new diliNode(false);
+    //             child->load(fp);
+    //             pe_data[i].setChild(child);
+    //         } else if (key == -2) {
+    //             fan2Leaf *fan2child = new fan2Leaf;
+    //             fan2child->load(fp);
+    //             pe_data[i].setFan2Child(fan2child);
+    //         } else {
+    //             pe_data[i].setNull();
+    //         }
+    //     }
+    // }
 
 
     void cal_lr_params(keyType *keys, int n_keys) { //}, vector<int>& child_fans) {

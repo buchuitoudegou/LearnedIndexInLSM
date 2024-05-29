@@ -426,22 +426,34 @@ int main(int argc, char *argv[]) {
             file_data->Report();
             // adgMod::learn_cb_model->Report();
             cout << "Shutting down" << endl;
+            std::cout<<"fresh_write:"<<adgMod::fresh_write<<std::endl;
             adgMod::db->WaitForBackground();
             delete db;
-
+            cout << "Closed" << endl;
             adgMod::LoadModelTimer = true;
 
-            status = DB::Open(options, db_location, &db);
-            assert(status.ok() && "Open Error");
-            adgMod::db->WaitForBackground();
+            adgMod::fresh_write=0;
 
-
-            cout << "Repoened" << endl;
-            vector<double> results;
+            for(int i=0; i<4; i++){
+                status = DB::Open(options, db_location, &db);
+                assert(status.ok() && "Open Error");
+                adgMod::db->WaitForBackground();
+                cout << "Repoened" << endl;
+                std::cout<<"fresh_write:"<<adgMod::fresh_write<<std::endl;
+                
+                adgMod::db->WaitForBackground();
+                delete db;
+            }
 
             adgMod::LoadModelTimer = false;
             // cout<<adgMod::LoadModelDuration<<","<<adgMod::DBOpenDUration<<endl;
 
+            status = DB::Open(options, db_location, &db);
+            assert(status.ok() && "Open Error");
+            adgMod::db->WaitForBackground();
+            cout << "Repoened" << endl;
+
+            vector<double> results;
             for(int j=0; j<1; j++){
                 // cout<<"In multi read"<<endl;
                 int hit_times = 0;
@@ -455,8 +467,8 @@ int main(int argc, char *argv[]) {
                 cout << "Ready to read" << endl;
                 auto ReadTimeStart = std::chrono::steady_clock::now();
                 string value;
-                int operation_num = exp_no == 2 ? keys_read.size() / 5  : keys_read.size();
-                for(int i=0; i<operation_num; i++){
+                int operation_num = keys_read.size();
+                for(int i=0; i<1000000; i++){
                     if(i%100000 == 0){
                         cout<<i<<" "<<keys_read[i].first<<" "<<keys_read[i].second<<endl;
                     }
@@ -470,10 +482,10 @@ int main(int argc, char *argv[]) {
                             hit_times++;
                             // cout<<"Non zero!"<<endl;
                         }
-                        // if (!status.ok()) {
-                        //     // cout << keys_read[i].second << " Not Found" << endl;
-                        //     // assert(status.ok() && "File Get Error");
-                        // }
+                        if (!status.ok()) {
+                            // cout << keys_read[i].second << " Not Found" << endl;
+                            // assert(status.ok() && "File Get Error");
+                        }
                     }
                     else if(option == "INSERT" || option == "UPDATE"){
                         status = db->Put(write_options, keys_read[i].second, {values.data() + uniform_dist_value(e2), (uint64_t) adgMod::value_size});
@@ -570,7 +582,7 @@ int main(int argc, char *argv[]) {
             std::fstream res;
             res.setf(std::ios::fixed,std::ios::floatfield);
             res.open("../evaluation/" + expname + ".out",std::ios::out|std::ios::app);
-            res<<exptag<<","<< TrainTimeMicro<<","<<ReadTimeMean<<","<<size_byte<<","<<adgMod::LoadModelDuration<<endl;
+            res<<exptag<<","<< TrainTimeMicro<<","<<ReadTimeMean<<","<<size_byte<<","<<adgMod::LoadModelDuration/5<<endl;
             // res<<" Bloom filter size is "<< BFsize <<" Byte.";
             // res<<" Learned index size is "<< size_byte <<" Byte.";
             // res<<" Fence Pointer size is "<< FencePointersize <<" Byte.";

@@ -33,6 +33,17 @@ struct fan2Leaf {
         fread(&k2, sizeof(keyType),1, fp);
         fread(&p2, sizeof(recordPtr),1, fp);
     }
+
+    void load_from_buffer(const char*& data_ptr) {
+        std::memcpy(&k1, data_ptr, sizeof(keyType));
+        data_ptr += sizeof(keyType);
+        std::memcpy(&p1, data_ptr, sizeof(recordPtr));
+        data_ptr += sizeof(recordPtr);
+        std::memcpy(&k2, data_ptr, sizeof(keyType));
+        data_ptr += sizeof(keyType);
+        std::memcpy(&p2, data_ptr, sizeof(recordPtr));
+        data_ptr += sizeof(recordPtr);
+    }
 };
 
 #endif //DILI_FAN2LEAF_H

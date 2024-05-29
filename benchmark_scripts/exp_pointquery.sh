@@ -4,7 +4,7 @@ sudo rm -rf /home/ubuntu/code/testdb_lognormal/LOCK
 
 echo "Random dataset" >> ../evaluation/experiment/PointQuery.out
 
-./read_cold -f /home/ubuntu/code/dataset/dataset/random_readonly_uniform_datset.dat -r /home/ubuntu/code/dataset/dataset/random_readonly_uniform_query.dat -b 10 -e 7 -k 16 -v 64 -d /home/ubuntu/code/testdb_random/ --blocksize 2097152 -m 7 --modelmode 0 --dataset 0 --workload 0 --exp 0 -w > 64Mrandom.log
+./read_cold -f /home/mengshi/code/DataGenerator/YCSB-Gen/output_dat/random_readonly_uniform_datset.dat -r /home/mengshi/code/DataGenerator/YCSB-Gen/output_dat/random_readonly_uniform_query.dat -b 10 -e 7 -k 16 -v 64 -d /home/mengshi/code/testdb_random/ --blocksize 2097152 -m 7 --modelmode 0 --dataset 0 --workload 0 --exp 0 -w > 64Mrandom.log
 ./read -f /home/ubuntu/code/dataset/dataset/random_readonly_uniform_datset.dat -r /home/ubuntu/code/dataset/dataset/random_readonly_uniform_query.dat -b 10 -e 7 -k 16 -v 64 -d /home/ubuntu/code/testdb_random/ --blocksize 2097152 -m 7 --modelmode 1 --dataset 0 --workload 0 --exp 0 -w >> 64Mrandom.log
 ./read -f /home/ubuntu/code/dataset/dataset/random_readonly_uniform_datset.dat -r /home/ubuntu/code/dataset/dataset/random_readonly_uniform_query.dat -b 10 -e 7 -k 16 -v 64 -d /home/ubuntu/code/testdb_random/ --blocksize 2097152 -m 7 --modelmode 2 --dataset 0 --workload 0 --exp 0 -w >> 64Mrandom.log
 ./read -f /home/ubuntu/code/dataset/dataset/random_readonly_uniform_datset.dat -r /home/ubuntu/code/dataset/dataset/random_readonly_uniform_query.dat -b 10 -e 7 -k 16 -v 64 -d /home/ubuntu/code/testdb_random/ --blocksize 2097152 -m 7 --modelmode 3 --dataset 0 --workload 0 --exp 0 -w >> 64Mrandom.log

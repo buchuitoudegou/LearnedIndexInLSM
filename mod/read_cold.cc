@@ -368,6 +368,9 @@ int main(int argc, char *argv[]) {
                     // cout << keys[i] << endl;
                     status = db->Put(write_options, keys[i], {values.data() + uniform_dist_value(e2), (uint64_t) adgMod::value_size});
                     assert(status.ok() && "File Put Error");
+                    if(!status.ok()){
+                        cout<<status.ToString()<<endl;
+                    }
                     // break;
             }
             cout << "Put Complete ready to sync" << endl;
@@ -446,14 +449,14 @@ int main(int argc, char *argv[]) {
                         // cout<<"Reading!"<<endl;
                         get_times++;
                         status = db->Get(read_options, keys_read[i].second, &value);
-                    // if (status.ok()) {
-                    //         hit_times++;
-                    //         // cout<<"Non zero!"<<endl;
-                    //     }
-                    //     if (!status.ok()) {
-                    //         // cout << keys_read[i].second << " Not Found" << endl;
-                    //         // assert(status.ok() && "File Get Error");
-                    //     }
+                    if (status.ok()) {
+                            hit_times++;
+                            // cout<<"Non zero!"<<endl;
+                        }
+                        if (!status.ok()) {
+                            cout << keys_read[i].second << " Not Found" << endl;
+                            assert(status.ok() && "File Get Error");
+                        }
                     }
                     else if(option == "INSERT"){
                         status = db->Put(write_options, keys_read[i].second, {values.data() + uniform_dist_value(e2), (uint64_t) adgMod::value_size});
@@ -480,7 +483,7 @@ int main(int argc, char *argv[]) {
                 ReadDuration = ReadTimeMicro;
                 // cout<<"ReadDuration: "<<ReadDuration<<endl;
                 results.push_back(ReadDuration);
-                // cout<<"Hit times: "<<hit_times<<" Get times: "<<get_times<<endl;
+                cout<<"Hit times: "<<hit_times<<" Get times: "<<get_times<<endl;
                 // sleep(1);
                 // adgMod::learn_cb_model->Report();
             }
@@ -500,7 +503,7 @@ int main(int argc, char *argv[]) {
 
             cout<<"Read complete"<<endl;
 
-            file_data->Report();
+            // file_data->Report();
             // cout << "Level model stats:" << endl;
             Version* current = adgMod::db->versions_->current();
             // for (int i = 1; i < config::kNumLevels; ++i) {
