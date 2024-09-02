@@ -10,7 +10,7 @@
 #define FInnerNodeType 1
 #define FLeafNodeType 0
 #define Disk 1
-#define Binary 0
+#define Binary 1
 #define BufferSize 256
 const long MaxNodeSize = BlockSize;
 

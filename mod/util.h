@@ -132,6 +132,23 @@ namespace adgMod {
     extern int iocounter;
     extern int rangelength;
 
+    // Jiarui
+    extern int LevelRead_counter;
+    extern double LevelRead_duration;
+    extern int prediction_counter;
+    extern double prediction_duration;
+    extern int bisearch_counter;
+    extern double bisearch_duration;
+    extern size_t prediction_range;
+    extern int RSbits;
+    extern int rmi_layer_size;
+    extern int lipp_gap;
+    extern int alex_node_size;
+    extern int bisearch_depth;
+    extern int compaction_count;
+    extern int memcompaction_count;
+    extern int newSST_count;
+    extern int filelearn_count;
 
     // some util functions
     uint64_t ExtractInteger(const char* pos, size_t size);

@@ -132,7 +132,7 @@ class StorageManager {
             if (first) {
                 fp = fopen(file_name,"wb");
 
-                char empty_block[BlockSize];
+                char empty_block[BlockSize]={0};
                 MetaNode mn;
                 mn.block_count = 1;
                 mn.level = 0;

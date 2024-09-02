@@ -801,13 +801,13 @@ class PosixEnv : public Env {
     std::priority_queue<std::pair<double, LearnParam>> learn_pq;
     bool wait_for_time = false;
     int64_t time_diff = 1000000;
-    prepare_queue_mutex.Lock();
+    // prepare_queue_mutex.Lock();
 
     // dead loop
-    while (true) {
-      while (learning_prepare.empty()) {
-        preparing_queue_cv.Wait();
-      }
+    // while (true) {
+      // while (learning_prepare.empty()) {
+      //   preparing_queue_cv.Wait();
+      // }
 
       uint32_t dummy;
       uint64_t time_start = (__rdtscp(&dummy) - instance->initial_time) / adgMod::reference_frequency;// - adgMod::learn_trigger_time * 1000;
@@ -838,20 +838,21 @@ class PosixEnv : public Env {
         int level = top.second.first;
         FileMetaData* meta = top.second.second;
         adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(meta->number);
-        prepare_queue_mutex.Unlock();
+        // prepare_queue_mutex.Unlock();
         adgMod::LearnedIndexData::FileLearn(new adgMod::MetaAndSelf{nullptr, 0, meta, model, level});
-        prepare_queue_mutex.Lock();
+        // prepare_queue_mutex.Lock();
+        adgMod::filelearn_count++;
         learn_pq.pop();
       }
 
       // if we decide to wait, sleep here
       if (wait_for_time) {
-        prepare_queue_mutex.Unlock();
+        // prepare_queue_mutex.Unlock();
         SleepForMicroseconds((int) (time_diff / 1000));
-        prepare_queue_mutex.Lock();
+        // prepare_queue_mutex.Lock();
         wait_for_time = false;
       }
-    }
+    // }
   }
 
   static void PrepareLearnEntryPoint(PosixEnv* env) {
@@ -860,15 +861,17 @@ class PosixEnv : public Env {
 
   void PrepareLearning(uint64_t time_start, int level, FileMetaData* meta) {
     if (adgMod::fresh_write || (adgMod::MOD != 6 && adgMod::MOD != 7 && adgMod::MOD != 9)) return;
-    MutexLock guard(&prepare_queue_mutex);
-    if (!preparing_thread_started) {
-        preparing_thread_started = true;
-        std::thread background_thread(PosixEnv::PrepareLearnEntryPoint, this);
-        background_thread.detach();
-    }
-
-    if (learning_prepare.empty()) preparing_queue_cv.Signal();
+    // MutexLock guard(&prepare_queue_mutex);
+    // if (!preparing_thread_started) {
+    //     preparing_thread_started = true;
+        // std::thread background_thread(PosixEnv::PrepareLearnEntryPoint, this);
+        // background_thread.detach();
+        
+    // }
+    PrepareLearnEntryPoint(this);   
+    // if (learning_prepare.empty()) preparing_queue_cv.Signal();
     learning_prepare.emplace(std::make_pair(time_start, std::make_pair(level, meta)));
+    adgMod::newSST_count++;
   }
 
 

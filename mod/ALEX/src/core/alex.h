@@ -94,7 +94,8 @@ class Alex {
     // Maximum node size, in bytes. By default, 16MB.
     // Higher values result in better average throughput, but worse tail/max
     // insert latency
-    int max_node_size = 1 << 11;
+    // int max_node_size = 1 << 11;
+    int max_node_size = adgMod::alex_node_size;
     // Approximate model computation: bulk load faster by using sampling to
     // train models
     bool approximate_model_computation = true;
@@ -107,8 +108,8 @@ class Alex {
   /* Setting max node size automatically changes these parameters */
   struct DerivedParams {
     // The defaults here assume the default max node size of 16MB
-    int max_fanout = 1 << 8;  // assumes 8-byte pointers
-    int max_data_node_slots = (1 << 11) / sizeof(V);
+    int max_fanout = adgMod::alex_node_size / sizeof(void*);  // assumes 8-byte pointers
+    int max_data_node_slots = adgMod::alex_node_size / sizeof(V);
 //      int max_data_node_slots = (1 << 15) / sizeof(V);
 
   };

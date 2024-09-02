@@ -26,7 +26,8 @@ class StorageManager {
         if (size >= 1000000) return 1;
         if (size >= 100000) return 2;
         if(adgMod::lipp_mode == 0){ //original lipp
-            return 5;
+            return adgMod::lipp_gap;
+            // return 5;
         }
         else{//lipp without gaps
             return 0;

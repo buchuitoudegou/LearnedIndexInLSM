@@ -7,6 +7,11 @@
 
 #include <string.h>
 
+// make ide happy
+// #ifndef LEVELDB_PLATFORM_POSIX
+// #define LEVELDB_PLATFORM_POSIX
+// #endif
+
 // Include the appropriate platform specific file below.  If you are
 // porting to a new platform, see "port_example.h" for documentation
 // of what the new port_<platform>.h file must provide.

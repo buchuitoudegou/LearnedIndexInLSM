@@ -336,8 +336,12 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
     //   std::cout<<"In file: "<<file_number<<std::endl; 
     //   std::cout<<"Learned flag:"<<learned<<std::endl;
     // }
+    static char* scratch=nullptr;
+    if(scratch==nullptr)
+      scratch=(char*)malloc(1000000);
     
-
+    auto start_time=std::chrono::steady_clock::now();
+    
     if(adgMod::modelmode == 0){
 #ifdef INTERNAL_TIMER
     instance->PauseTimer(1);
@@ -363,7 +367,11 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       ParseInternalKey(k, &parsed_key);
       adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(meta->number);
       // std::cout<<"Now query:"<<adgMod::SliceToInteger(parsed_key.user_key)<<std::endl;
+      auto beforeTime = std::chrono::steady_clock::now();
       auto bounds = model->GetPosition(parsed_key.user_key);
+      auto duration_microsecond = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
+      adgMod::prediction_counter++;
+      adgMod::prediction_duration+=duration_microsecond;
       table_entries = model->size;
       // std::cout<<"Entries in this table is:"<< table_entries<<std::endl;
       lower = bounds.first;
@@ -511,9 +519,10 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       beforeTime = std::chrono::steady_clock::now();
     #endif
     size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
+    adgMod::prediction_range+=read_size;
     // printf("here is read size: %zu, and entry entries: %lu\n", pos_block_upper - pos_block_lower + 1, adgMod::entry_size);
     // printf("blockoffset: %lu\n", block_offset);
-    static char scratch[4096];
+
     Slice entries;
     s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
     assert(s.ok());
@@ -534,6 +543,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
     #ifdef INTERNAL_TIMER
       beforeTime = std::chrono::steady_clock::now();
     #endif
+    auto beforeTime = std::chrono::steady_clock::now();
     uint64_t left = pos_block_lower, right = pos_block_upper;
     // std::cout<<right - left<<std::endl;
     while (left < right) {
@@ -565,6 +575,9 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
         right = mid;
       }
     }
+    auto duration_microsecond = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
+    adgMod::bisearch_duration += duration_microsecond;
+    adgMod::bisearch_counter++;
     #ifdef INTERNAL_TIMER
       afterTime = std::chrono::steady_clock::now();
       duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();
@@ -625,7 +638,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
 
       Slice entries;
       // uint64_t offset =  v * adgMod::entry_size;
-      static char scratch[4096];
+      // static char scratch[4096];
       // s = file->Read(offset, adgMod::entry_size, &entries, scratch);
       s = file->Read(block_offset + relative_idx * adgMod::entry_size, adgMod::entry_size, &entries, scratch);
       uint32_t shared, non_shared, value_length;
@@ -672,7 +685,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
 
       Slice entries;
       // uint64_t offset =  v * adgMod::entry_size;
-      static char scratch[4096];
+      // static char scratch[4096];
       // s = file->Read(offset, adgMod::entry_size, &entries, scratch);
       s = file->Read(block_offset + relative_idx * adgMod::entry_size, adgMod::entry_size, &entries, scratch);
 
@@ -693,11 +706,12 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(meta->number);
       // std::cout<<"Now query:"<<adgMod::SliceToInteger(parsed_key.user_key)<<std::endl;
       long long int search_key = stoll(parsed_key.user_key.ToString());
-      // auto beforeTime = std::chrono::steady_clock::now();
+      auto beforeTime = std::chrono::steady_clock::now();
       pgm::ApproxPos range = model->pgm.pgmsearch(search_key);
-      // auto afterTime = std::chrono::steady_clock::now();
-      // double duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();
-      // adgMod::getposd += duration_microsecond;
+      auto afterTime = std::chrono::steady_clock::now();
+      double duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();
+      adgMod::prediction_duration+=duration_microsecond;
+      adgMod::prediction_counter++;
 
       // std::cout<<"file name:"<<meta->number<<std::endl;
       // std::cout<<"pos: "<<range.pos<<" lo:"<<range.lo<<" hi:"<<range.hi<<std::endl;
@@ -760,11 +774,12 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // std::cout<<"haha?"<<std::endl;
       // printf("1. here is read size: %lu, and entry entries: %lu\n", pos_block_upper - pos_block_lower + 1, adgMod::entry_size);
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
+      adgMod::prediction_range+=read_size;
       // std::cout<<"Read size calculated:"<<read_size<<std::endl;
       // printf("2. here is read size: %zu, and entry entries: %lu\n", pos_block_upper - pos_block_lower + 1, adgMod::entry_size);
       // std::cout<<"blockoffset: "<<block_offset<<std::endl;
       // printf("blockoffset: %lu\n", block_offset);
-      static char scratch[81920];
+      // static char scratch[81920];
       Slice entries;
       // std::cout<<"ready to read()"<<std::endl;
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
@@ -773,6 +788,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
 
       uint64_t left = pos_block_lower, right = pos_block_upper;
       // std::cout<<right - left<<std::endl;
+      beforeTime = std::chrono::steady_clock::now();
       while (left < right) {
         // std::cout<<right - left<<std::endl;
         uint32_t mid = (left + right) / 2;
@@ -789,7 +805,10 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
           right = mid;
         }
       }
-
+      afterTime = std::chrono::steady_clock::now();
+      duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();
+      adgMod::bisearch_duration+=duration_microsecond;
+      adgMod::bisearch_counter++;
       // decode the target entry to get the key and value (actually value_addr)
       uint32_t shared, non_shared, value_length;
       const char* key_ptr = DecodeEntry(entries.data() + (left - pos_block_lower) * adgMod::entry_size,
@@ -807,7 +826,12 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // std::cout<<"Now query:"<<adgMod::SliceToInteger(parsed_key.user_key)<<std::endl;
       long long int search_key = stoll(parsed_key.user_key.ToString());
       // auto beforeTime = std::chrono::steady_clock::now();
+      auto beforeTime = std::chrono::steady_clock::now();
       auto range = model->rmi.search(search_key);
+      auto duration_microsecond = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
+      adgMod::prediction_counter++;
+      adgMod::prediction_duration+=duration_microsecond;
+     
       // auto afterTime = std::chrono::steady_clock::now();
       // double duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();
       // adgMod::getposd += duration_microsecond;
@@ -872,15 +896,17 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
 
       // std::cout<<"Key:"<<adgMod::SliceToInteger(parsed_key.user_key)<<"bisearch bound:"<< pos_block_lower<<" "<<pos_block_upper<<std::endl;
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
+      adgMod::prediction_range+=read_size;
       // printf("here is read size: %zu, and entry entries: %lu\n", pos_block_upper - pos_block_lower + 1, adgMod::entry_size);
       // printf("blockoffset: %lu\n", block_offset);
-      static char scratch[81920];
+      // static char scratch[81920];
       Slice entries;
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
       assert(s.ok());
 
       uint64_t left = pos_block_lower, right = pos_block_upper;
       // std::cout<<right - left<<std::endl;
+      beforeTime = std::chrono::steady_clock::now();
       while (left < right) {
         // std::cout<<right - left<<std::endl;
         uint32_t mid = (left + right) / 2;
@@ -896,8 +922,11 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
         } else {
           right = mid;
         }
+        adgMod::bisearch_depth++;
       }
-
+      duration_microsecond = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
+      adgMod::bisearch_duration+=duration_microsecond;
+      adgMod::bisearch_counter++;
       // decode the target entry to get the key and value (actually value_addr)
       uint32_t shared, non_shared, value_length;
       const char* key_ptr = DecodeEntry(entries.data() + (left - pos_block_lower) * adgMod::entry_size,
@@ -916,7 +945,12 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // std::cout<<"Now query:"<<adgMod::SliceToInteger(parsed_key.user_key)<<std::endl;
       long long int search_key = stoll(parsed_key.user_key.ToString());
       // auto beforeTime = std::chrono::steady_clock::now();
+      auto beforeTime = std::chrono::steady_clock::now();
       auto range = model->rs.GetSearchBound(search_key);
+      auto duration_microsecond = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
+      adgMod::prediction_counter++;
+      adgMod::prediction_duration+=duration_microsecond;
+            
       // auto afterTime = std::chrono::steady_clock::now();
       // double duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();
       // adgMod::getposd += duration_microsecond;
@@ -981,13 +1015,16 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
 
       // std::cout<<"Key:"<<adgMod::SliceToInteger(parsed_key.user_key)<<"bisearch bound:"<< pos_block_lower<<" "<<pos_block_upper<<std::endl;
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
+      adgMod::prediction_range+=read_size;
       // printf("here is read size: %zu, and entry entries: %lu\n", pos_block_upper - pos_block_lower + 1, adgMod::entry_size);
       // printf("blockoffset: %lu\n", block_offset);
-      static char scratch[81920];
+      // static char* scratch = nullptr;
+      // if(scratch==nullptr)
+      //   scratch=(char*)malloc(100000000);
       Slice entries;
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
       assert(s.ok());
-
+      beforeTime = std::chrono::steady_clock::now();   
       uint64_t left = pos_block_lower, right = pos_block_upper;
       // std::cout<<right - left<<std::endl;
       while (left < right) {
@@ -1006,7 +1043,9 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
           right = mid;
         }
       }
-
+      duration_microsecond = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
+      adgMod::bisearch_counter++;
+      adgMod::bisearch_duration+=duration_microsecond;
       // decode the target entry to get the key and value (actually value_addr)
       uint32_t shared, non_shared, value_length;
       const char* key_ptr = DecodeEntry(entries.data() + (left - pos_block_lower) * adgMod::entry_size,
@@ -1023,10 +1062,12 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(meta->number);
       // std::cout<<"Now query:"<<adgMod::SliceToInteger(parsed_key.user_key)<<std::endl;
       long long int search_key = stoll(parsed_key.user_key.ToString());
-      // auto beforeTime = std::chrono::steady_clock::now();
+      auto beforeTime = std::chrono::steady_clock::now();
       auto range = model->ts.GetSearchBound(search_key);
-      // auto afterTime = std::chrono::steady_clock::now();
-      // double duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();
+      auto afterTime = std::chrono::steady_clock::now();
+      double duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();
+      adgMod::prediction_duration+=duration_microsecond;
+      adgMod::prediction_counter++;
       // adgMod::getposd += duration_microsecond;
       // std::cout<<" lo:"<<range.begin<<" hi:"<<range.end<<std::endl;
 
@@ -1089,22 +1130,26 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
 
       // std::cout<<"Key:"<<adgMod::SliceToInteger(parsed_key.user_key)<<"bisearch bound:"<< pos_block_lower<<" "<<pos_block_upper<<std::endl;
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
+      adgMod::prediction_range+=read_size;
       // printf("here is read size: %zu, and entry entries: %lu\n", pos_block_upper - pos_block_lower + 1, adgMod::entry_size);
       // printf("blockoffset: %lu\n", block_offset);
-      static char scratch[81920];
+      // static char* scratch = nullptr;
+      // if(scratch==nullptr)
+      //   scratch=(char*)malloc(100000000);
       Slice entries;
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
       assert(s.ok());
 
       uint64_t left = pos_block_lower, right = pos_block_upper;
       // std::cout<<right - left<<std::endl;
+      beforeTime=std::chrono::steady_clock::now();
       while (left < right) {
         // std::cout<<right - left<<std::endl;
         uint32_t mid = (left + right) / 2;
         uint32_t shared, non_shared, value_length;
         const char* key_ptr = DecodeEntry(entries.data() + (mid - pos_block_lower) * adgMod::entry_size,
                 entries.data() + read_size, &shared, &non_shared, &value_length);
-        assert(key_ptr != nullptr && shared == 0 && "Entry Corruption");
+        assert(key_ptr!=0 && key_ptr != nullptr && shared == 0 && "Entry Corruption");
         Slice mid_key(key_ptr, non_shared);
         // std::cout<<"Midkey: "<<mid_key.ToString()<<std::endl;
         int comp = tf->table->rep_->options.comparator->Compare(mid_key, k);
@@ -1114,7 +1159,9 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
           right = mid;
         }
       }
-
+      duration_microsecond = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
+      adgMod::bisearch_counter++;
+      adgMod::bisearch_duration+=duration_microsecond;
       // decode the target entry to get the key and value (actually value_addr)
       uint32_t shared, non_shared, value_length;
       const char* key_ptr = DecodeEntry(entries.data() + (left - pos_block_lower) * adgMod::entry_size,
@@ -1154,7 +1201,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
 
       Slice entries;
       // uint64_t offset =  v * adgMod::entry_size;
-      static char scratch[4096];
+      // static char scratch[4096];
       // s = file->Read(offset, adgMod::entry_size, &entries, scratch);
       s = file->Read(block_offset + relative_idx * adgMod::entry_size, adgMod::entry_size, &entries, scratch);
 
@@ -1258,7 +1305,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
       // printf("here is read size: %zu, and entry entries: %lu\n", pos_block_upper - pos_block_lower + 1, adgMod::entry_size);
       // printf("blockoffset: %lu\n", block_offset);
-      static char scratch[81920];
+      // static char scratch[81920];
       Slice entries;
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
       assert(s.ok());
@@ -1328,6 +1375,9 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       
 
     }
+    auto duration=std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now()-start_time).count();
+    adgMod::LevelRead_duration+=duration;
+    adgMod::LevelRead_counter++;
 }
 
 

@@ -210,7 +210,7 @@ bool LearnedIndexData::Learn(string filename) {
   else if(adgMod::modelmode == 2){
     string index_name = adgMod::db_name + "/" + filename + ".fmodel";
     char * index_name_p = &index_name[0];
-    ft.error_bound = adgMod::file_model_error;
+    ft.error_bound = error;
     ft.sm = new ft::StorageManager(true, index_name_p);
 
 
@@ -242,7 +242,7 @@ bool LearnedIndexData::Learn(string filename) {
         // std::cout<<i<<" "<<data[i].value<<std::endl;
     }
         
-    ft.bulk_load_pgm(data, count, data2.begin(), data2.end(), adgMod::file_model_error);
+    ft.bulk_load_pgm(data, count, data2.begin(), data2.end(), error);
   }
   else if (adgMod::modelmode == 3){
     string index_name = adgMod::db_name + "/" + filename + ".fmodel";
@@ -268,7 +268,7 @@ bool LearnedIndexData::Learn(string filename) {
     }
 
 
-    pgm::MappedPGMIndex<long long, 1024> pgm_(data.begin(), data.end(), index_name);
+    pgm::MappedPGMIndex<long long, PGM_Error, PGM_internal_Error> pgm_(data.begin(), data.end(), index_name);
     pgm = pgm_;
 
   }
@@ -276,7 +276,7 @@ bool LearnedIndexData::Learn(string filename) {
   else if (adgMod::modelmode == 4){
     // std::cout<<"Training RMI models "<< filename <<"..."<<std::endl;
     string index_name = adgMod::db_name + "/" + filename + ".fmodel";
-    std::size_t layer2_size = 2UL << 9;
+    std::size_t layer2_size = adgMod::rmi_layer_size;
     int count = string_keys.size();
     real_num_entries = count;
     std::vector<long long int> keys;
@@ -328,7 +328,7 @@ bool LearnedIndexData::Learn(string filename) {
 
     long long int min = keys.front();
     long long int max = keys.back();
-    rs::Builder<long long int> rsb(min, max);
+    rs::Builder<long long int> rsb(min, max, adgMod::RSbits, error);
     for (const auto& key : keys) rsb.AddKey(key);
     rs::RadixSpline<long long int> rs_;
     rs_ = rsb.Finalize();
@@ -358,7 +358,7 @@ bool LearnedIndexData::Learn(string filename) {
     }
     long long int min = keys.front();
     long long int max = keys.back();
-    ts::Builder<long long int> rsb(min, max, 32);
+    ts::Builder<long long int> rsb(min, max, error);
     for (const auto& key : keys) rsb.AddKey(key);
     ts::TrieSpline<long long int> ts_;
     ts_ = rsb.Finalize();
@@ -508,7 +508,9 @@ uint64_t LearnedIndexData::FileLearn(void* arg) {
 
   // std::cout<<"Learning File:"<<fimename<<std::endl;
 
-  Version* c = db->GetCurrentVersion();
+  // Version* c = db->GetCurrentVersion();
+  Version* c = db->versions_->current();
+  c->Ref();
   if (self->FillData(c, mas->meta)) {
     // std::cout<<"Data Filled"<<std::endl;
     self->Learn(fimename);
@@ -517,7 +519,8 @@ uint64_t LearnedIndexData::FileLearn(void* arg) {
     // std::cout<<"Data NOT Filled"<<std::endl;
     self->learning.store(false);
   }
-  adgMod::db->ReturnCurrentVersion(c);
+  // adgMod::db->ReturnCurrentVersion(c);
+  c->Unref();
 
   auto time = instance->PauseTimer(11, true);
 
@@ -765,7 +768,7 @@ void LearnedIndexData::ReadModel(const string& filename) {
   else if(adgMod::modelmode == 3){
     std::ifstream input_file(filename);
     if (!input_file.good()) return;
-    pgm::MappedPGMIndex<long long, 1024> pgm_(filename);
+    pgm::MappedPGMIndex<long long, PGM_Error,PGM_internal_Error> pgm_(filename);
     pgm = pgm_;
   }
   else if(adgMod::modelmode == 4){

@@ -101,6 +101,24 @@ namespace adgMod {
     int iocounter = 0;
     int rangelength = 0;
 
+    // Jiarui
+    int LevelRead_counter=0;
+    double LevelRead_duration=0;
+    int prediction_counter=0;
+    double prediction_duration=0;
+    int bisearch_counter=0;
+    double bisearch_duration=0;
+    size_t prediction_range=0;
+    int RSbits=18;
+    int rmi_layer_size=1024;
+    int lipp_gap=5;
+    int alex_node_size = 1 << 11;
+    int bisearch_depth=0;
+    int compaction_count=0;
+    int memcompaction_count=0;
+    int filelearn_count=0;
+    int newSST_count=0;
+
     uint64_t ExtractInteger(const char* pos, size_t size) {
         char* temp = new char[size + 1];
         memcpy(temp, pos, size);

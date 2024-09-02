@@ -105,7 +105,7 @@ namespace adgMod {
         StorageManager<lippKeyType, lippValueType> lipp_index;
         //fitting tree
         ft::FITingTree ft;
-        pgm::MappedPGMIndex<long long int, 1024> pgm;
+        pgm::MappedPGMIndex<long long int, PGM_Error, PGM_internal_Error> pgm;
         rmi::RmiLAbs<long long int, rmi::LinearSpline, rmi::LinearRegression> rmi;
         rs::RadixSpline<long long int> rs;
         ts::TrieSpline<long long int> ts;

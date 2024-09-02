@@ -365,13 +365,17 @@ int main(int argc, char *argv[]) {
             // status = db->Write(write_options, &batch);
             // perform loadi
             for (int i = 0; i < keys.size(); ++i) {
-                    // cout << keys[i] << endl;
-                    status = db->Put(write_options, keys[i], {values.data() + uniform_dist_value(e2), (uint64_t) adgMod::value_size});
-                    assert(status.ok() && "File Put Error");
-                    if(!status.ok()){
-                        cout<<status.ToString()<<endl;
-                    }
-                    // break;
+                if(i%(keys.size()/10)==0)
+                {
+                    cout<<i/(keys.size()/10)<<"/10"<<endl;
+                }
+                // cout << keys[i] << endl;
+                status = db->Put(write_options, keys[i], {values.data() + uniform_dist_value(e2), (uint64_t) adgMod::value_size});
+                assert(status.ok() && "File Put Error");
+                if(!status.ok()){
+                    cout<<status.ToString()<<endl;
+                }
+                // break;
             }
             cout << "Put Complete ready to sync" << endl;
             adgMod::db->vlog->Sync();

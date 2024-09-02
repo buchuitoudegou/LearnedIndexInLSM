@@ -94,25 +94,33 @@ class LinearSpline
         return out << m.slope() << " * x + " << m.intercept();
     }
 
-    void write_file_m(std::string filename){
-        std::ofstream file(filename, std::ios::app); // Open the file in append mode
-        if (!file) {
-            std::cerr << "Unable to open file " << filename << " in Linear Spline";
-            return;
-        }
+    // void write_file_m(std::string filename){
+    //     std::ofstream file(filename, std::ios::app); // Open the file in append mode
+    //     if (!file) {
+    //         std::cerr << "Unable to open file " << filename << " in Linear Spline";
+    //         return;
+    //     }
+    //     file << std::setprecision(writeprecision) << slope_ << " " << intercept_ << std::endl; // Write the LinearSpline object to the file
+    //     file.close();
+    //     return;
+    // }
+
+    // void read_file_m(std::string filename){
+    //     std::ifstream file(filename); // Open the file in read mode
+    //     if (!file) {
+    //         std::cerr << "Unable to open file " << filename << " in Linear Spline";
+    //         return;
+    //     }
+    //     file >> slope_ >> intercept_; // Read the slope and intercept from the file
+    //     file.close();
+    // }
+    void write_file_m(std::ofstream&file){
         file << std::setprecision(writeprecision) << slope_ << " " << intercept_ << std::endl; // Write the LinearSpline object to the file
-        file.close();
         return;
     }
-
-    void read_file_m(std::string filename){
-        std::ifstream file(filename); // Open the file in read mode
-        if (!file) {
-            std::cerr << "Unable to open file " << filename << " in Linear Spline";
-            return;
-        }
+    void read_file_m(std::ifstream &file){
         file >> slope_ >> intercept_; // Read the slope and intercept from the file
-        file.close();
+        return;
     }
 };
 
@@ -224,25 +232,32 @@ class LinearRegression
         return out << m.slope() << " * x + " << m.intercept();
     }
 
-    void write_file_m(std::string filename){
-        std::ofstream file(filename, std::ios::app); // Open the file in append mode
-        if (!file) {
-            std::cerr << "Unable to open file " << filename << " in Linear Regression";
-            return;
-        }
+    // void write_file_m(std::string filename){
+    //     std::ofstream file(filename, std::ios::app); // Open the file in append mode
+    //     if (!file) {
+    //         std::cerr << "Unable to open file " << filename << " in Linear Regression";
+    //         return;
+    //     }
+    //     file << std::setprecision(writeprecision) << slope_ << " " << intercept_ << std::endl; // Write the LinearSpline object to the file
+    //     file.close();
+    //     return;
+    // }
+    void write_file_m(std::ofstream &file){
         file << std::setprecision(writeprecision) << slope_ << " " << intercept_ << std::endl; // Write the LinearSpline object to the file
-        file.close();
         return;
     }
 
-    void read_file_m(std::string filename){
-        std::ifstream file(filename); // Open the file in read mode
-        if (!file) {
-            std::cerr << "Unable to open file " << filename << " in Linear Regression";
-            return;
-        }
+    // void read_file_m(std::string filename){
+    //     std::ifstream file(filename); // Open the file in read mode
+    //     if (!file) {
+    //         std::cerr << "Unable to open file " << filename << " in Linear Regression";
+    //         return;
+    //     }
+    //     file >> slope_ >> intercept_; // Read the slope and intercept from the file
+    //     file.close();
+    // }
+    void read_file_m(std::ifstream &file){
         file >> slope_ >> intercept_; // Read the slope and intercept from the file
-        file.close();
     }
 };
 

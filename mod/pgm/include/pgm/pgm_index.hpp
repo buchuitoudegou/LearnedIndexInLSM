@@ -27,6 +27,10 @@
 #include <vector>
 #include <cstring>
 #include <iostream>
+
+#define PGM_Error 1024
+#define PGM_internal_Error 100
+
 namespace pgm {
 
 #define PGM_SUB_EPS(x, epsilon) ((x) <= (epsilon) ? 0 : ((x) - (epsilon)))

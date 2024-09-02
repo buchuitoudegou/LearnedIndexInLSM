@@ -180,11 +180,12 @@ class Rmi
 
         //write models
         // std::cout<<"\tWriting l1 model to file:"<<std::endl;
-        l1_.write_file_m(filename);
+        l1_.write_file_m(file);
         // std::cout<<"\tWriting "<< layer2_size_ << " models in layer2 to file"<<std::endl;
         for(int i=0; i<layer2_size_; i++){
-            l2_[i].write_file_m(filename);
+            l2_[i].write_file_m(file);
         }
+        file.close();
         return;
     }
 
@@ -194,12 +195,13 @@ class Rmi
         file >> n_keys_ >> layer2_size_;
 
         //read models
-        l1_.read_file_m(filename);
+        l1_.read_file_m(file);
         // std::cout<<"there are "<< layer2_size_ << " models in layer2"<<std::endl;
         l2_ = new layer2_type[layer2_size_];
         for(int i=0; i<layer2_size_; i++){
-            l2_[i].read_file_m(filename);
+            l2_[i].read_file_m(file);
         }
+        file.close();
         return 0;
     }
 };
