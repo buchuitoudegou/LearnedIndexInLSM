@@ -14,7 +14,9 @@ class LearnedIterator : public Iterator {
     last_block_num_entries(file_model->real_num_entries - (num_blocks - 1) * adgMod::block_num_entries),
     block_content(), current_block(-1), current_entry(-1), key_(), value_() { };
 
-  virtual ~LearnedIterator() = default;
+  virtual ~LearnedIterator() {
+    delete[] scratch;
+  }
 
   virtual void Seek(const Slice& target) {
 		adgMod::Stats* instance = adgMod::Stats::GetInstance();
@@ -553,8 +555,8 @@ class LearnedIterator : public Iterator {
 	adgMod::LearnedIndexData* file_model;
   int file_num;
   
-  // char* scratch = nullptr;
-  char scratch[4096];
+  char* scratch = nullptr;
+  // char scratch[4096];
   const uint32_t num_blocks;  
 	const uint32_t last_block_num_entries;
   
@@ -580,6 +582,9 @@ class LearnedIterator : public Iterator {
     // std::cout<<"read_size:"<<read_size<<std::endl;
     read_size *= adgMod::entry_size;
     // std::cout<<"read_size:"<<read_size<<" current block:"<<current_block<<" block_size:"<<adgMod::block_size<<std::endl;
+    if (scratch == nullptr) {
+      scratch = new char[read_size];
+    }
     Status s = file->Read(current_block * adgMod::block_size, read_size, &block_content, scratch);
     assert(s.ok());
   }
