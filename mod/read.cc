@@ -213,7 +213,7 @@ int main(int argc, char *argv[]) {
             ("e,modelerror", "bits per key", cxxopts::value<int>(model_error)->default_value("8"))
             ("x,dummy", "dummy option")
             ("l,load_type", "load type", cxxopts::value<int>(load_type)->default_value("0"))
-            ("filter", "use filter", cxxopts::value<bool>(adgMod::use_filter)->default_value("false"))
+            // ("filter", "use filter", cxxopts::value<bool>(adgMod::use_filter)->default_value("false"))
             ("mix", "portion of writes in workload in 1000 operations", cxxopts::value<int>(num_mix)->default_value("0"))
             ("distribution", "operation distribution", cxxopts::value<string>(distribution_filename)->default_value(""))
             ("change_level_load", "load level model", cxxopts::value<bool>(change_level_load)->default_value("false"))
@@ -413,18 +413,12 @@ int main(int argc, char *argv[]) {
             std::cout<<command<<std::endl;
             rc = system(delete_models.c_str());
 
-            // cout << "Opening DB" << endl;
             status = DB::Open(options, db_location, &db);
             assert(status.ok() && "Open Error");
-            // cout << "Opened DB" << endl;
             Version* current = adgMod::db->versions_->current();
-            // cout << "Opened DB1" << endl;
             // sleep(1);
             // db->PrintFileInfo();
             cout<<db<<endl;
-            // cout << "Opened DB2" << endl;
-
-            // instance->StartTimer(9);
 
             // perform loadi
             for (int i = 0; i < keys.size(); ++i) {

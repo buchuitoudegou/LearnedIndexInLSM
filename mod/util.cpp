@@ -28,7 +28,7 @@ namespace adgMod {
     FileLearnedIndexData* file_data = nullptr;
     CBModel_Learn* learn_cb_model = nullptr;
     uint64_t fd_limit = 1024 * 1024;
-    bool use_filter = false;
+    // bool use_filter = false;
     bool restart_read = false;
     bool fresh_write = false;
     bool reopen = false;
@@ -118,6 +118,7 @@ namespace adgMod {
     int memcompaction_count=0;
     int filelearn_count=0;
     int newSST_count=0;
+    size_t bloom_size=0;
 
     uint64_t ExtractInteger(const char* pos, size_t size) {
         char* temp = new char[size + 1];

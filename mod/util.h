@@ -59,7 +59,7 @@ namespace adgMod {
     extern CBModel_Learn* learn_cb_model;
     // During our experiments, we unlimit file descriptor numbers. LevelDB default is 1024
     extern uint64_t fd_limit;
-    extern bool use_filter;
+    // extern bool use_filter;
     extern bool restart_read;
     extern bool fresh_write;
     extern bool reopen;
@@ -149,6 +149,7 @@ namespace adgMod {
     extern int memcompaction_count;
     extern int newSST_count;
     extern int filelearn_count;
+    extern size_t bloom_size;
 
     // some util functions
     uint64_t ExtractInteger(const char* pos, size_t size);
