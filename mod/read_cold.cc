@@ -93,7 +93,7 @@ enum LoadType {
 
 int main(int argc, char *argv[]) {
     int rc;
-    int num_operations, num_iteration, num_mix, block_size;
+    int num_operations, num_iteration, num_mix, block_size, write_buffer_size;
     float test_num_segments_base;
     float num_pair_step;
     string db_location, profiler_out, input_filename, distribution_filename, ycsb_filename, read_filename;
@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
             ("n,get_number", "the number of gets (to be multiplied by 1024)", cxxopts::value<int>(num_operations)->default_value("1000"))
             ("s,step", "the step of the loop of the size of db", cxxopts::value<float>(num_pair_step)->default_value("1"))
             ("i,iteration", "the number of iterations of a same size", cxxopts::value<int>(num_iteration)->default_value("1"))
-            ("m,modification", "if set, run our modified version, 7 fjle-model bourbon, 8 wiskey, 9 ours", cxxopts::value<int>(adgMod::MOD)->default_value("0"))
+            ("m,modification", "if set, run our modified version, 7 file-model bourbon, 8 wiskey, 9 ours", cxxopts::value<int>(adgMod::MOD)->default_value("0"))
             ("h,help", "print help message", cxxopts::value<bool>()->default_value("false"))
             ("d,directory", "the directory of db", cxxopts::value<string>(db_location)->default_value("/mnt/ssd/testdb"))
             ("k,key_size", "the size of key", cxxopts::value<int>(adgMod::key_size)->default_value("16"))
@@ -170,6 +170,7 @@ int main(int argc, char *argv[]) {
             ("level_model_error", "error in level model", cxxopts::value<uint32_t>(adgMod::level_model_error)->default_value("1"))
             ("f,input_file", "the filename of input file", cxxopts::value<string>(input_filename)->default_value(""))
             ("blocksize", "block size in SSTables", cxxopts::value<int>(block_size)->default_value("4096"))
+            ("buffersize","db write buffer size", cxxopts::value<int>(write_buffer_size)->default_value("4194304"))
             ("r,read_file", "the filename of read file", cxxopts::value<string>(read_filename)->default_value(""))
             ("multiple", "test: use larger keys", cxxopts::value<uint64_t>(adgMod::key_multiple)->default_value("1"))
             ("w,write", "writedb", cxxopts::value<bool>(fresh_write)->default_value("false"))
@@ -179,7 +180,7 @@ int main(int argc, char *argv[]) {
             ("e,modelerror", "bits per key", cxxopts::value<int>(model_error)->default_value("8"))
             ("x,dummy", "dummy option")
             ("l,load_type", "load type", cxxopts::value<int>(load_type)->default_value("0"))
-            ("filter", "use filter", cxxopts::value<bool>(adgMod::use_filter)->default_value("false"))
+            // ("filter", "use filter", cxxopts::value<bool>(adgMod::use_filter)->default_value("false"))
             ("mix", "portion of writes in workload in 1000 operations", cxxopts::value<int>(num_mix)->default_value("0"))
             ("distribution", "operation distribution", cxxopts::value<string>(distribution_filename)->default_value(""))
             ("change_level_load", "load level model", cxxopts::value<bool>(change_level_load)->default_value("false"))
@@ -189,7 +190,12 @@ int main(int argc, char *argv[]) {
             ("YCSB", "use YCSB trace", cxxopts::value<string>(ycsb_filename)->default_value(""))
             ("insert", "insert new value", cxxopts::value<int>(insert_bound)->default_value("0"))
             ("modelmode", "mm=0 plr, mm=1 lipp", cxxopts::value<int>(adgMod::modelmode)->default_value("0"))
+            ("RSbits","RS radix bits",cxxopts::value<int>(adgMod::RSbits)->default_value("18"))
+            ("rmisize","RMI layer2 size",cxxopts::value<int>(adgMod::rmi_layer_size)->default_value("1024"))
+            ("lippgap","lipp gap", cxxopts::value<int>(adgMod::lipp_gap)->default_value("5"))
+            ("alexnodesize","alex max node size",cxxopts::value<int>(adgMod::alex_node_size)->default_value("2048"))
             ("alexinterval", "alex*", cxxopts::value<int>(adgMod::alex_interval)->default_value("1"))
+            ("lippmode", "lipp*", cxxopts::value<int>(adgMod::lipp_mode)->default_value("0"))
             ("dataset","name of dataset", cxxopts::value<int>(dataset_no)->default_value("0"))
             ("workload","name of workload", cxxopts::value<int>(workload_no)->default_value("0"))
             ("exp","name of workload", cxxopts::value<int>(exp_no)->default_value("0"))
@@ -392,8 +398,20 @@ int main(int argc, char *argv[]) {
             sleep(1);
             // reopen DB and do offline leraning
             if (print_file_info && iteration == 0) db->PrintFileInfo();
+            cout<<"Bloom filter tot size: "<<bloom_size<<endl;
             adgMod::db->WaitForBackground();
             delete db;
+            string expname = ExpMap[exp_no];
+            std::fstream res;
+            res.setf(std::ios::fixed,std::ios::floatfield);
+            res.open("/home/jiarui/LearnedIndexInLSM/evaluation/" + expname + ".out",std::ios::out|std::ios::app);
+            res<<"bloom filter size: "<<bloom_size<<endl;
+            res.close();
+            return 0;
+
+
+
+
             status = DB::Open(options, db_location, &db);
             adgMod::db->WaitForBackground();
             cout << "Repoened" << endl;
@@ -548,11 +566,11 @@ int main(int argc, char *argv[]) {
             string modelname = ModelMap[adgMod::modelmode];
             string datasetname = DatasetMap[dataset_no];
             string workloadname = WorkloadMap[workload_no];
-            string expname = ExpMap[exp_no];
+            // string expname = ExpMap[exp_no];
 
             string exptag = modelname + "_" + datasetname + "_" + workloadname + "_" + std::to_string(length_range);
 
-            std::fstream res;
+            // std::fstream res;
             res.setf(std::ios::fixed,std::ios::floatfield);
             res.open("../evaluation/" + expname + ".out",std::ios::out|std::ios::app);
             res<<exptag<<","<< TrainTimeMicro<<","<<ReadTimeMean<<","<<size_byte<<","<<adgMod::LoadModelDuration<<std::endl;
