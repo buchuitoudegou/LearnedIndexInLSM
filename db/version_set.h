@@ -26,6 +26,10 @@
 #include "port/thread_annotations.h"
 
 namespace leveldb {
+int64_t TotalSizeForLevel(const std::vector<FileMetaData*>* files_, int level, const Options *options);
+int RunNumberLevel(const std::vector<FileMetaData*>* files_, int level, const Options *options);
+int GetStartPhysicalLevel(int logical_level, const Options *options);
+int GetEndPhysicalLevel(int logical_level, const Options *options);
 
 namespace log {
 class Writer;
@@ -117,6 +121,7 @@ class Version {
 
   // print level summary
   void PrintAll() const;
+  void PrintLevelSummary() const;
   int GetFileNum() const;
   // Fill file model data
   bool FillData(const ReadOptions& options, FileMetaData* meta, adgMod::LearnedIndexData* data);
@@ -321,6 +326,8 @@ class VersionSet {
 
   void SetupOtherInputs(Compaction* c);
 
+  void SetupInputsForCompaction(Compaction* c);
+
   // Save current contents to *log
   Status WriteSnapshot(log::Writer* log);
 
@@ -402,7 +409,7 @@ class Compaction {
   VersionEdit edit_;
 
   // Each compaction reads inputs from "level_" and "level_+1"
-  std::vector<FileMetaData*> inputs_[2];  // The two sets of inputs
+  std::vector<FileMetaData*> inputs_[config::kNumLevels];  // The two sets of inputs
 
   // State used to check for number of overlapping grandparent files
   // (parent == level_ + 1, grandparent == level_ + 2)

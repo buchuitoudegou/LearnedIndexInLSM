@@ -150,6 +150,8 @@ class LEVELDB_EXPORT DB {
   virtual void CompactRange(const Slice* begin, const Slice* end) = 0;
 
   virtual void PrintFileInfo() = 0;
+
+  virtual void PrintLevelInfo() {}
 };
 
 // Destroy the contents of the specified database.

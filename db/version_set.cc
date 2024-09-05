@@ -47,9 +47,9 @@ namespace leveldb {
         // the level-0 compaction threshold based on number of files.
 
         // Result for both level-0 and level-1
-        double result = 10. * 1048576.0;
+        double result = options->max_bytes_for_level_base;
         while (level > 1) {
-            result *= 10;
+            result *= options->max_bytes_for_level_multiplier;
             level--;
         }
         return result;
@@ -66,6 +66,52 @@ namespace leveldb {
             sum += files[i]->file_size;
         }
         return sum;
+    }
+
+    int64_t TotalSizeForLevel(const std::vector<FileMetaData*>* files_, int level, const Options *options) {
+        if (options->compaction_policy == kCompactionStyleLevel || level == 0) {
+            return TotalFileSize(files_[level]);
+        }
+        int start_physical_level = GetStartPhysicalLevel(level, options);
+        int end_physical_level = GetEndPhysicalLevel(level, options);
+        int64_t total_size = 0;
+        for (int j = start_physical_level; j < end_physical_level; j++) {
+            total_size += TotalFileSize(files_[j]);
+        }
+        return total_size;
+    }
+
+    int RunNumberLevel(const std::vector<FileMetaData*>* files_, int level, const Options *options) {
+        if (options->compaction_policy == kCompactionStyleLevel) {
+            return 1;
+        }
+        int start_physical_level = GetStartPhysicalLevel(level, options);
+        int end_physical_level = GetEndPhysicalLevel(level, options);
+        int run_number = 0;
+        for (int j = start_physical_level; j < end_physical_level; j++) {
+            if (files_[j].size() > 0) {
+                run_number ++;
+            }
+        }
+        return run_number;
+    }
+
+    int GetStartPhysicalLevel(int logical_level, const Options *options) {
+        if (options->compaction_policy == kCompactionStyleLevel || logical_level == 0) {
+            return logical_level;
+        }
+        return (logical_level - 1) * options->max_bytes_for_level_multiplier + 1;
+    }
+
+    int GetEndPhysicalLevel(int logical_level, const Options *options) {
+        if (options->compaction_policy == kCompactionStyleLevel || logical_level == 0) {
+            return logical_level + 1;
+        }
+        if (options->compaction_policy == kCompactionStyleTier || 
+            (options->compaction_policy == kCompactionStyleLazyLevel && logical_level != options->max_logical_level - 1)) {
+            return logical_level * options->max_bytes_for_level_multiplier + 1;
+        }
+        return (logical_level - 1) * options->max_bytes_for_level_multiplier + 2;
     }
 
     Version::~Version() {
@@ -1226,7 +1272,7 @@ namespace leveldb {
         int best_level = -1;
         double best_score = -1;
 
-        for (int level = 0; level < config::kNumLevels - 1; level++) {
+        for (int level = 0; level < options_->max_logical_level; level++) {
             double score;
             if (level == 0) {
                 // We treat level-0 specially by bounding the number of files
@@ -1240,16 +1286,27 @@ namespace leveldb {
                 // file size is small (perhaps because of a small write-buffer
                 // setting, or very high compression ratios, or lots of
                 // overwrites/deletions).
+                assert(options_->compaction_policy == kCompactionStyleLevel ||
+                       options_->L0_compaction_trigger == options_->max_bytes_for_level_multiplier);
                 score = v->files_[level].size() /
-                        static_cast<double>(config::kL0_CompactionTrigger);
+                        static_cast<double>(options_->L0_compaction_trigger);
             } else {
                 // Compute the ratio of current size to size limit.
-                const uint64_t level_bytes = TotalFileSize(v->files_[level]);
+                const uint64_t level_bytes = TotalSizeForLevel(v->files_, level, options_);
+                const int run_number = RunNumberLevel(v->files_, level, options_);
                 score =
                         static_cast<double>(level_bytes) / MaxBytesForLevel(options_, level);
+                if (options_->compaction_policy != kCompactionStyleLevel) {
+                    score = std::max(score, (double)run_number / static_cast<double>(options_->max_bytes_for_level_multiplier));
+                }
             }
 
-            if (score > best_score) {
+            // if (score > best_score) {
+            //     best_level = level;
+            //     best_score = score;
+            // }
+            if (score >= 1) {
+                // compact the bottom level first
                 best_level = level;
                 best_score = score;
             }
@@ -1297,7 +1354,6 @@ namespace leveldb {
 
     const char *VersionSet::LevelSummary(LevelSummaryStorage *scratch) const {
         // Update code if kNumLevels changes
-        static_assert(config::kNumLevels == 7, "");
         snprintf(scratch->buffer, sizeof(scratch->buffer),
                  "files[ %d %d %d %d %d %d %d ]", int(current_->files_[0].size()),
                  int(current_->files_[1].size()), int(current_->files_[2].size()),
@@ -1416,23 +1472,46 @@ namespace leveldb {
         // Level-0 files have to be merged together.  For other levels,
         // we will make a concatenating iterator per level.
         // TODO(opt): use concatenating iterator for level-0 if there is no overlap
-        const int space = (c->level() == 0 ? c->inputs_[0].size() + 1 : 2);
+        // const int space = (c->level() == 0 ? c->inputs_[0].size() + 1 : 2);
+        int space = 0;
+        switch (options_->compaction_policy) {
+            case kCompactionStyleLevel:
+                space = (c->level() == 0) ? c->inputs_[0].size() + 1 : 2;
+                break;
+            case kCompactionStyleTier:
+                if (c->level() == 0) {
+                    space = c->inputs_[0].size();
+                } else {
+                    space = options_->max_bytes_for_level_multiplier;
+                }
+                break;
+            case kCompactionStyleLazyLevel:
+                if (c->level() == 0) {
+                    space = c->inputs_[0].size();
+                } else {
+                    space = options_->max_bytes_for_level_multiplier;
+                }
+                if (c->level() == options_->max_logical_level - 2) {
+                    space ++;
+                }
+                break;
+        }
         Iterator **list = new Iterator *[space];
         int num = 0;
-        for (int which = 0; which < 2; which++) {
-            if (!c->inputs_[which].empty()) {
-                if (c->level() + which == 0) {
-                    const std::vector<FileMetaData *> &files = c->inputs_[which];
-                    for (size_t i = 0; i < files.size(); i++) {
-                        list[num++] = table_cache_->NewIterator(options, files[i]->number,
-                                                                files[i]->file_size);
-                    }
-                } else {
-                    // Create concatenating iterator for the files from this level
-                    list[num++] = NewTwoLevelIterator(
-                            new Version::LevelFileNumIterator(icmp_, &c->inputs_[which]),
-                            &GetFileIterator, table_cache_, options);
+        for (int which = 0; which < config::kNumLevels; which++) {
+            if (c->inputs_[which].empty()) {
+                break;
+            }
+            if (which == 0 && c->level() == 0) {
+                const std::vector<FileMetaData *> &files = c->inputs_[which];
+                for (size_t i = 0; i < files.size(); i++) {
+                    list[num++] = table_cache_->NewIterator(options, files[i]->number,
+                                                            files[i]->file_size);
                 }
+            }  else {
+                list[num++] = NewTwoLevelIterator(
+                    new Version::LevelFileNumIterator(icmp_, &c->inputs_[which]),
+                    &GetFileIterator, table_cache_, options);
             }
         }
         assert(num <= space);
@@ -1443,35 +1522,37 @@ namespace leveldb {
 
     Compaction *VersionSet::PickCompaction() {
         Compaction *c;
-        int level;
+        int logical_level;
 
         // We prefer compactions triggered by too much data in a level over
         // the compactions triggered by seeks.
         const bool size_compaction = (current_->compaction_score_ >= 1);
         const bool seek_compaction = (current_->file_to_compact_ != nullptr);
         if (size_compaction) {
-            level = current_->compaction_level_;
-            assert(level >= 0);
-            assert(level + 1 < config::kNumLevels);
-            c = new Compaction(options_, level);
-
-            // Pick the first file that comes after compact_pointer_[level]
-            for (size_t i = 0; i < current_->files_[level].size(); i++) {
-                FileMetaData *f = current_->files_[level][i];
-                if (compact_pointer_[level].empty() ||
-                    icmp_.Compare(f->largest.Encode(), compact_pointer_[level]) > 0) {
-                    c->inputs_[0].push_back(f);
-                    break;
-                }
+            // Note: this is the logical level. It is the same as physical level if you are using Level Compaction
+            logical_level = current_->compaction_level_;
+            int start_physical_level = GetStartPhysicalLevel(logical_level, options_);
+            int end_physical_level = start_physical_level + 1;
+            if (logical_level != 0 && (options_->compaction_policy == kCompactionStyleTier || 
+                (options_->compaction_policy == kCompactionStyleLazyLevel && logical_level != options_->max_logical_level - 1))) {
+                end_physical_level = start_physical_level + options_->max_bytes_for_level_multiplier;
             }
-            if (c->inputs_[0].empty()) {
-                // Wrap-around to the beginning of the key space
-                c->inputs_[0].push_back(current_->files_[level][0]);
+            assert(level >= 0);
+            c = new Compaction(options_, logical_level);
+            
+            // Pick all the file at this level
+            int idx = 0;
+            for (int i = start_physical_level; i < end_physical_level; i++) {
+                for (size_t j = 0; j < current_->files_[i].size(); j++) {
+                    c->inputs_[idx].push_back(current_->files_[i][j]);
+                    if (i == 0 && c->inputs_[0].size() >= options_->L0_compaction_trigger) {
+                        break;
+                    }
+                }
+                idx ++;
             }
         } else if (seek_compaction) {
-            level = current_->file_to_compact_level_;
-            c = new Compaction(options_, level);
-            c->inputs_[0].push_back(current_->file_to_compact_);
+            return nullptr;
         } else {
             return nullptr;
         }
@@ -1479,18 +1560,7 @@ namespace leveldb {
         c->input_version_ = current_;
         c->input_version_->Ref();
 
-        // Files in level 0 may overlap each other, so pick up all overlapping ones
-        if (level == 0) {
-            InternalKey smallest, largest;
-            GetRange(c->inputs_[0], &smallest, &largest);
-            // Note that the next call will discard the file we placed in
-            // c->inputs_[0] earlier and replace it with an overlapping set
-            // which will include the picked file.
-            current_->GetOverlappingInputs(0, &smallest, &largest, &c->inputs_[0]);
-            assert(!c->inputs_[0].empty());
-        }
-
-        SetupOtherInputs(c);
+        SetupInputsForCompaction(c);
 
         return c;
     }
@@ -1635,6 +1705,23 @@ namespace leveldb {
         c->edit_.SetCompactPointer(level, largest);
     }
 
+    void VersionSet::SetupInputsForCompaction(Compaction* c) {
+        if (options_->compaction_policy == kCompactionStyleTier ||
+            (options_->compaction_policy == kCompactionStyleLazyLevel && c->level() != options_->max_logical_level - 1)) {
+            return;
+        }
+        int target_level = c->level() + 1;
+        if (options_->compaction_policy == kCompactionStyleLazyLevel && c->level() == options_->max_logical_level - 1) {
+            target_level = (c->level() - 1) * options_->max_bytes_for_level_multiplier + 1;
+        }
+        // we enable full-merge by default
+        // collect all the file at this level
+        int idx = (options_->compaction_policy == kCompactionStyleLevel) ? 1 : options_->max_bytes_for_level_multiplier;
+        for (int i = 0; i < current_->files_[target_level].size(); i++) {
+            c->inputs_[idx].push_back(current_->files_[target_level][i]);
+        }
+    }
+
     Compaction *VersionSet::CompactRange(int level, const InternalKey *begin,
                                          const InternalKey *end) {
         std::vector<FileMetaData *> inputs;
@@ -1687,19 +1774,21 @@ namespace leveldb {
     }
 
     bool Compaction::IsTrivialMove() const {
-        const VersionSet *vset = input_version_->vset_;
-        // Avoid a move if there is lots of overlapping grandparent data.
-        // Otherwise, the move could create a parent file that will require
-        // a very expensive merge later on.
-        return (num_input_files(0) == 1 && num_input_files(1) == 0 &&
-                TotalFileSize(grandparents_) <=
-                MaxGrandParentOverlapBytes(vset->options_));
+        return false;
+        // const VersionSet *vset = input_version_->vset_;
+        // // Avoid a move if there is lots of overlapping grandparent data.
+        // // Otherwise, the move could create a parent file that will require
+        // // a very expensive merge later on.
+        // return (num_input_files(0) == 1 && num_input_files(1) == 0 &&
+        //         TotalFileSize(grandparents_) <=
+        //         MaxGrandParentOverlapBytes(vset->options_));
     }
 
     void Compaction::AddInputDeletions(VersionEdit *edit) {
-        for (int which = 0; which < 2; which++) {
+        int start_physical_level = GetStartPhysicalLevel(level_, input_version_->vset_->options_);
+        for (int which = 0; which < config::kNumLevels; which++) {
             for (size_t i = 0; i < inputs_[which].size(); i++) {
-                edit->DeleteFile(level_ + which, inputs_[which][i]->number);
+                edit->DeleteFile(start_physical_level + which, inputs_[which][i]->number);
             }
         }
     }
@@ -1771,6 +1860,20 @@ namespace leveldb {
                        "\tKey Range: %s to %s\n", j, i, file->number, file->file_size, 0ul,
                        small_key.c_str(), large_key.c_str());
             }
+        }
+    }
+
+    void Version::PrintLevelSummary() const {
+        for (int i = 0; i < config::kNumLevels; ++i) {
+            auto& files = files_[i];
+            uint64_t total_size = 0;
+            int num_files = files.size();
+            printf("Level %d: {", i);
+            for (int j = 0; j < num_files; ++j) {
+                total_size += files[j]->file_size;
+                printf("#%lu ", files[j]->number);
+            }
+            printf("}, a total of %d files, %lu bytes\n", num_files, total_size);
         }
     }
 

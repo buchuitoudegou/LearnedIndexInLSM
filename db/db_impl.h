@@ -75,6 +75,7 @@ class DBImpl : public DB {
 
 
   virtual void PrintFileInfo();
+  virtual void PrintLevelInfo();
   Version* GetCurrentVersion();
   void ReturnCurrentVersion(Version* version);
   void WaitForBackground();

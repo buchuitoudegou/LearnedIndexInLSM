@@ -10,3 +10,6 @@ cmake-*
 build/
 out/
 evaluation/
+
+*default.txt
+log/*
