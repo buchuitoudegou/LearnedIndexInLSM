@@ -859,8 +859,10 @@ class PosixEnv : public Env {
         // background_thread.detach();
         
     // }
-    PrepareLearnEntryPoint(this);
+      
+    // if (learning_prepare.empty()) preparing_queue_cv.Signal();
     learning_prepare.emplace(std::make_pair(time_start, std::make_pair(level, meta)));
+    PrepareLearn();
     adgMod::newSST_count++;
   }
 

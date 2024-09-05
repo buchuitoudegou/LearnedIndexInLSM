@@ -6,6 +6,7 @@
 
 #include "leveldb/slice.h"
 #include "util/hash.h"
+#include "mod/util.h"
 #include <iostream>
 
 namespace leveldb {
@@ -36,7 +37,7 @@ class BloomFilterPolicy : public FilterPolicy {
 
     size_t bytes = (bits + 7) / 8;
     bits = bytes * 8;
-
+    adgMod::bloom_size+=bytes;
     const size_t init_size = dst->size();
     dst->resize(init_size + bytes, 0);
     dst->push_back(static_cast<char>(k_));  // Remember # of probes in filter
