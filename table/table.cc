@@ -369,6 +369,7 @@ void Table::FillData(const ReadOptions& options, adgMod::LearnedIndexData* data)
       Slice temp_slice = index_iter->value();
       temp.DecodeFrom(&temp_slice);
       adgMod::block_size = temp.size() + kBlockTrailerSize;
+      adgMod::block_num_entries_recorded=false;
     }
 
     if (!adgMod::block_num_entries_recorded) {
@@ -378,7 +379,9 @@ void Table::FillData(const ReadOptions& options, adgMod::LearnedIndexData* data)
         BlockHandle temp;
         Slice temp_slice = index_iter->value();
         temp.DecodeFrom(&temp_slice);
+        std::cout<<"entry_size: "<<adgMod::entry_size<<endl;
         std::cout<<"block_num_entries is: "<<adgMod::block_num_entries<<std::endl;
+        std::cout<<"restart array: "<< block_iter->num_restarts_<<endl;
         //Here!!
         adgMod::block_size = temp.size() + kBlockTrailerSize;
     }

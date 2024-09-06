@@ -150,6 +150,10 @@ namespace adgMod {
     extern int newSST_count;
     extern int filelearn_count;
     extern size_t bloom_size;
+    extern double learn_duration;
+    extern double compaction_duration;
+    extern size_t compaction_size_inputs;
+    extern size_t compaction_size_outputs;
 
     // some util functions
     uint64_t ExtractInteger(const char* pos, size_t size);

@@ -108,7 +108,8 @@ Options SanitizeOptions(const std::string& dbname,
   ClipToRange(&result.max_open_files, 64 + kNumNonTableCacheFiles, 50000);
   ClipToRange(&result.write_buffer_size, 64 << 10, 1 << 30);
   ClipToRange(&result.max_file_size, 1 << 20, 1 << 30);
-  ClipToRange(&result.block_size, 1 << 10, 4 << 20);
+  // ClipToRange(&result.block_size, 1 << 10, 4 << 20);
+  ClipToRange(&result.block_size, 1 << 10, 1 << 30);
   if (result.info_log == nullptr) {
     // Open a log file in the same directory as the db
     src.env->CreateDir(dbname);  // In case it does not exist
@@ -769,7 +770,10 @@ void DBImpl::BackgroundCall() {
   } else if (!bg_error_.ok()) {
     // No more background work after a background error.
   } else {
+    auto start_timer=std::chrono::steady_clock::now();
     BackgroundCompaction();
+    auto end_timer=std::chrono::steady_clock::now();
+    adgMod::compaction_duration+=std::chrono::duration<double, std::micro>(end_timer - start_timer).count();
   }
 
   background_compaction_scheduled_ = false;
@@ -843,6 +847,8 @@ void DBImpl::BackgroundCompaction() {
         static_cast<unsigned long long>(f->file_size),
         status.ToString().c_str(), versions_->LevelSummary(&tmp));
   } else {
+    // cout<<"Compaction input size: "<<c->get_input_size()<<endl;
+    adgMod::compaction_size_inputs+=c->get_input_size();
     CompactionState* compact = new CompactionState(c);
     status = DoCompactionWork(compact);
     if (!status.ok()) {
@@ -861,26 +867,26 @@ void DBImpl::BackgroundCompaction() {
       adgMod::LearnedIndexData::LevelLearn(new adgMod::VersionAndSelf{current, version_count, current->learned_index_data_[level+1].get(), level+1}, true);
   }
 
-    if (c != nullptr) {
-        std::set<int> changed_level;
-        for (auto& item: c->edit()->deleted_files_) {
-            changed_level.insert(item.first);
-        }
-        for (auto& item: c->edit()->new_files_) {
-            changed_level.insert(item.first);
-        }
+  if (c != nullptr) {
+      std::set<int> changed_level;
+      for (auto& item: c->edit()->deleted_files_) {
+          changed_level.insert(item.first);
+      }
+      for (auto& item: c->edit()->new_files_) {
+          changed_level.insert(item.first);
+      }
 
-        string changed_level_string;
+      string changed_level_string;
 
-        auto time = instance->PauseTimer(7, true);
+      auto time = instance->PauseTimer(7, true);
 
-        adgMod::compaction_counter_mutex.Lock();
-        for (auto item: changed_level) {
-            changed_level_string += to_string(item);
-            adgMod::levelled_counters[5].Increment(item, time.second - time.first);
-        }
-        adgMod::events[0].push_back(new CompactionEvent(time, std::move(changed_level_string)));
-        adgMod::compaction_counter_mutex.Unlock();
+      adgMod::compaction_counter_mutex.Lock();
+      for (auto item: changed_level) {
+          changed_level_string += to_string(item);
+          adgMod::levelled_counters[5].Increment(item, time.second - time.first);
+      }
+      adgMod::events[0].push_back(new CompactionEvent(time, std::move(changed_level_string)));
+      adgMod::compaction_counter_mutex.Unlock();
 
 
 
@@ -1017,6 +1023,8 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
   meta->smallest = output->smallest;
   meta->largest = output->largest;
 
+  // cout<<"New file size: "<<meta->file_size<<endl;
+  adgMod::compaction_size_outputs+=meta->file_size;
   // When a new file is generated, it's put into learning_prepare queue.
   env_->PrepareLearning((__rdtscp(&dummy) - instance->initial_time) / adgMod::reference_frequency, level, meta);
 

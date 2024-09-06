@@ -118,7 +118,7 @@ enum LoadType {
 
 int main(int argc, char *argv[]) {
     int rc;
-    int num_operations, num_iteration, num_mix, block_size, write_buffer_size;
+    int num_operations, num_iteration, num_mix, block_size, write_buffer_size, max_file_size;
     float test_num_segments_base;
     float num_pair_step;
     string db_location, profiler_out, input_filename, distribution_filename, ycsb_filename, read_filename;
@@ -128,6 +128,7 @@ int main(int argc, char *argv[]) {
     string db_location_copy;
     int bpk, model_error;
     int dataset_no, workload_no, exp_no;
+    string dataset_name;
 
     //0:plr, 1:lipp 2:ft 3.pgm 4.rmi 5.rs 6. plex 7.dili 8. alex
     map<int, string> ModelMap = {
@@ -203,6 +204,7 @@ int main(int argc, char *argv[]) {
             ("level_model_error", "error in level model", cxxopts::value<uint32_t>(adgMod::level_model_error)->default_value("1"))
             ("f,input_file", "the filename of input file", cxxopts::value<string>(input_filename)->default_value(""))
             ("blocksize", "block size in SSTables", cxxopts::value<int>(block_size)->default_value("4096"))
+            ("SST", "SST size", cxxopts::value<int>(max_file_size)->default_value("4194304"))
             ("buffersize","db write buffer size", cxxopts::value<int>(write_buffer_size)->default_value("4194304"))
             ("r,read_file", "the filename of read file", cxxopts::value<string>(read_filename)->default_value(""))
             ("multiple", "test: use larger keys", cxxopts::value<uint64_t>(adgMod::key_multiple)->default_value("1"))
@@ -229,7 +231,8 @@ int main(int argc, char *argv[]) {
             ("alexnodesize","alex max node size",cxxopts::value<int>(adgMod::alex_node_size)->default_value("2048"))
             ("alexinterval", "alex*", cxxopts::value<int>(adgMod::alex_interval)->default_value("1"))
             ("lippmode", "lipp*", cxxopts::value<int>(adgMod::lipp_mode)->default_value("0"))
-            ("dataset","name of dataset", cxxopts::value<int>(dataset_no)->default_value("0"))
+            ("dataset","name of dataset", cxxopts::value<string>(dataset_name)->default_value("Unknown"))
+            // ("dataset","name of dataset", cxxopts::value<int>(dataset_no)->default_value("0"))
             ("workload","name of workload", cxxopts::value<int>(workload_no)->default_value("0"))
             ("exp","name of workload", cxxopts::value<int>(exp_no)->default_value("0"))
             ("range", "use range query and specify length", cxxopts::value<int>(length_range)->default_value("0"));
@@ -380,6 +383,9 @@ int main(int argc, char *argv[]) {
 
         options.create_if_missing = true;
         options.filter_policy = leveldb::NewBloomFilterPolicy(bpk);
+        options.max_file_size=max_file_size;
+        if(options.max_file_size<block_size)
+            options.max_file_size=block_size;
         options.block_size = block_size;
         options.write_buffer_size=write_buffer_size;
         cout<<"Block size: "<<options.block_size<<endl;
@@ -403,6 +409,9 @@ int main(int argc, char *argv[]) {
         //    cout << "delete and trim complete" << endl;
             string delete_models = "find " + db_location + " -type f -name \"*.fmodel\" -delete";
             std::cout<<delete_models<<std::endl;
+            rc = system(delete_models.c_str());
+
+            string delete_fnum = "rm "+db_location+"/*.fnum";
             rc = system(delete_models.c_str());
 
             string command = "sudo rm -rf " + db_location + "LOCK";
@@ -641,11 +650,11 @@ int main(int argc, char *argv[]) {
             {
                 modelname=modelname+"-"+std::to_string(alex_node_size);
             }
-            string datasetname = DatasetMap[dataset_no];
-            string workloadname = WorkloadMap[workload_no];
+            // string datasetname = DatasetMap[dataset_no];
+            // string workloadname = WorkloadMap[workload_no];
             string expname = ExpMap[exp_no];
 
-            string exptag = modelname + "_" + datasetname + "_" + workloadname + "_" + std::to_string(length_range)+"_"+std::to_string(model_error);
+            string exptag = modelname + "_" + dataset_name + "_" + std::to_string(length_range)+"_"+std::to_string(model_error);
 
             std::fstream res;
             res.setf(std::ios::fixed,std::ios::floatfield);
@@ -658,7 +667,8 @@ int main(int argc, char *argv[]) {
                 << get_avg_bisearch_duration() << "\t"
                 << get_avg_prediction_range() << "\t"
                 << ReadDuration / read_times << "\t"
-                << WriteDuration / write_times << endl;
+                << WriteDuration / write_times << "\t"
+                << 1.0*bisearch_depth/bisearch_counter<< endl;
             cout << exptag << "\t" << TrainTimeMicro << "\t"
                 << OPTimeMean / NUM_OP << "\t" << size_byte << "\t"
                 << adgMod::LoadModelDuration / NUM_RELOAD << "\t"
@@ -667,14 +677,25 @@ int main(int argc, char *argv[]) {
                 << get_avg_bisearch_duration() << "\t"
                 << get_avg_prediction_range() << "\t"
                 << ReadDuration / read_times << "\t"
-                << WriteDuration / write_times << endl;
-            cout<<adgMod::filelearn_count<<"/"<<newSST_count<<endl;
-            res<<adgMod::filelearn_count<<"/"<<newSST_count<<endl;
+                << WriteDuration / write_times << "\t"
+                << 1.0*bisearch_depth/bisearch_counter<< endl;
+
+            // cout<<learn_duration/filelearn_count<<endl;
+
+            cout << adgMod::filelearn_count << "/" << newSST_count << " "
+                 << adgMod::compaction_size_inputs << " "
+                 << compaction_size_outputs << " " << compaction_duration << " "
+                 << compaction_count << endl;
+            res << adgMod::filelearn_count << "/" << newSST_count << " "
+                << adgMod::compaction_size_inputs << " "
+                << compaction_size_outputs << " " << compaction_duration << " "
+                << compaction_count << endl;
             // res<<1.0*bisearch_depth/bisearch_counter<<endl;
             // res<<" Bloom filter size is "<< BFsize <<" Byte.";
             // res<<" Learned index size is "<< size_byte <<" Byte.";
             // res<<" Fence Pointer size is "<< FencePointersize <<" Byte.";
-            // res<<" Total size is "<< (FencePointersize + size_byte + BFsize)/1024 <<" KB.";
+            // res<<" Total size is "<< (FencePointersize + size_byte +
+            // BFsize)/1024 <<" KB.";
 
             // res<<" Memtable time:"<<adgMod::MemtableDuration/results.size();
             // res<<" Level model time:"<<adgMod::FindFileDuration/results.size();

@@ -172,7 +172,7 @@ class PosixRandomAccessFile final : public RandomAccessFile {
               char* scratch) const override {
     int fd = fd_;
     if (!has_permanent_fd_) {
-      fd = ::open(filename_.c_str(), O_RDONLY);
+      fd = ::open(filename_.c_str(), O_RDONLY|O_DIRECT);
       // std::cout<<"status code: "<<fd<<std::endl;
       if (fd < 0) {
         return PosixError(filename_, errno);
@@ -185,19 +185,16 @@ class PosixRandomAccessFile final : public RandomAccessFile {
 
     Status status;
     // std::cout<<"n:"<<n<<" offset:"<<offset<<std::endl;
-    ssize_t read_size = ::pread(fd, scratch, n, static_cast<off_t>(offset));
+    int new_n=n%512?n+(512-n%512):n;
+    ssize_t read_size = ::pread(fd, scratch, new_n, static_cast<off_t>(offset));
     if (read_size < 0) {
       // An error: return a non-ok status.
       status = PosixError(filename_, errno);
       std::cout << "pread Error: " << status.ToString() << std::endl;
     }
     // std::cout<<"read size inside read(): "<<read_size<<std::endl;
-    *result = Slice(scratch, (read_size < 0) ? 0 : read_size);
+    *result = Slice(scratch, (read_size < 0) ? 0 : (read_size<n?read_size:n));
     
-    if (read_size < 0) {
-      // An error: return a non-ok status.
-      status = PosixError(filename_, errno);
-    }
     if (!has_permanent_fd_) {
       // Close the temporary file descriptor opened earlier.
       assert(fd != fd_);
@@ -871,7 +868,10 @@ class PosixEnv : public Env {
       
     // if (learning_prepare.empty()) preparing_queue_cv.Signal();
     learning_prepare.emplace(std::make_pair(time_start, std::make_pair(level, meta)));
+    auto start_time=std::chrono::steady_clock::now();
     PrepareLearn();
+    auto end_time=std::chrono::steady_clock::now();
+    adgMod::learn_duration+=std::chrono::duration<double, std::micro>(start_time - end_time).count();
     adgMod::newSST_count++;
   }
 

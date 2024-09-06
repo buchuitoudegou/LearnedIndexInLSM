@@ -390,6 +390,23 @@ class Compaction {
   // is successful.
   void ReleaseInputs();
 
+  // Jiarui
+  size_t get_input_size()
+  {
+    size_t ret=0;
+    for(int level=0;level<2;++level)
+    {
+      auto files=inputs_[level];
+      for(auto file : files)
+      {
+        if(!file)
+          continue;
+        ret+=file->file_size;
+      }
+    }
+    return ret;
+  }
+
  private:
   friend class Version;
   friend class VersionSet;

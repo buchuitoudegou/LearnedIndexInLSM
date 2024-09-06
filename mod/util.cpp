@@ -36,6 +36,8 @@ namespace adgMod {
     int modelmode = 0; //0:plr, 1:lipp 2:ft 3.pgm 4.rmi 5.rs 6. plex 7.dili 8. alex
     int alex_interval = 1;
     int lipp_mode = 0;
+    size_t compaction_size_inputs = 0;
+    size_t compaction_size_outputs = 0;
 
     // the time we wait before learning (as the file may die within this short time and
     // if we learn, we waste the learning)
@@ -119,6 +121,8 @@ namespace adgMod {
     int filelearn_count=0;
     int newSST_count=0;
     size_t bloom_size=0;
+    double learn_duration=0;
+    double compaction_duration=0;
 
     uint64_t ExtractInteger(const char* pos, size_t size) {
         char* temp = new char[size + 1];
