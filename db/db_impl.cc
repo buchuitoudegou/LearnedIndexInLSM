@@ -44,6 +44,12 @@
 
 namespace leveldb {
 
+namespace config {
+  int kL0_CompactionTrigger = 4;
+  int kL0_SlowdownWritesTrigger = 8;
+  int kL0_StopWritesTrigger = 12;
+}
+
 const int kNumNonTableCacheFiles = 10;
 
 // Information kept for every waiting writer
@@ -556,9 +562,10 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   if (s.ok() && meta.file_size > 0) {
     const Slice min_user_key = meta.smallest.user_key();
     const Slice max_user_key = meta.largest.user_key();
-    if (base != nullptr) {
-      level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
-    }
+    // Put memtable to L0
+    // if (base != nullptr) {
+    //   level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
+    // }
     edit->AddFile(level, meta.number, meta.file_size, meta.smallest,
                   meta.largest);
 
@@ -1054,9 +1061,26 @@ Status DBImpl::InstallCompactionResults(CompactionState* compact) {
   // Add compaction outputs
   compact->compaction->AddInputDeletions(compact->compaction->edit());
   const int level = compact->compaction->level();
+  int target_level = level + 1;
+  if (options_.compaction_policy != kCompactionStyleLevel) {
+    if (options_.compaction_policy != kCompactionStyleLazyLevel || target_level != options_.max_logical_level - 1) {
+      // need to find an empty level
+      int target_start_physical_level = GetStartPhysicalLevel(target_level, &options_);
+      int target_end_physical_level = GetEndPhysicalLevel(target_level, &options_);
+      for (int j = target_end_physical_level - 1; j >= target_start_physical_level; j--) {
+        if (versions_->NumLevelFiles(j) == 0) {
+          target_level = j;
+          break;
+        }
+      }
+    } else {
+      // lazy level compaction to the last level
+      target_level = GetStartPhysicalLevel(target_level, &options_);
+    }
+  }
   for (size_t i = 0; i < compact->outputs.size(); i++) {
     const CompactionState::Output& out = compact->outputs[i];
-    compact->compaction->edit()->AddFile(level + 1, out.number, out.file_size,
+    compact->compaction->edit()->AddFile(target_level, out.number, out.file_size,
                                          out.smallest, out.largest);
   }
   return versions_->LogAndApply(compact->compaction->edit(), &mutex_);
@@ -1091,7 +1115,6 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   bool has_current_user_key = false;
   SequenceNumber last_sequence_for_key = kMaxSequenceNumber;
 
-//  vector<string> keys;
 
   for (; input->Valid() && !shutting_down_.load(std::memory_order_acquire);) {
     // Prioritize immutable compaction work
@@ -1108,9 +1131,6 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     }
 
     Slice key = input->key();
-//    ParsedInternalKey parsed;
-//    ParseInternalKey(key, &parsed);
-//    keys.push_back(parsed.user_key);
 
     if (compact->compaction->ShouldStopBefore(key) &&
         compact->builder != nullptr) {
@@ -1217,6 +1237,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
 
   mutex_.Lock();
   stats_[compact->compaction->level() + 1].Add(stats);
+  Log(options_.info_log, "compacted from: %d, bytes read: %ld, bytes written: %ld, use time: %ld (%ld secs)",
+      compact->compaction->level(), stats.bytes_read, stats.bytes_written, stats.micros, stats.micros / 1000000);
 
   if (status.ok()) {
     status = InstallCompactionResults(compact);
@@ -1867,6 +1889,14 @@ void DBImpl::PrintFileInfo() {
     ver->PrintAll();
     // std::cout<<"flag4"<<std::endl;
     ver->Unref();
+}
+
+void DBImpl::PrintLevelInfo() {
+  MutexLock l(&mutex_);
+  Version* ver = versions_->current();
+  ver->Ref();
+  ver->PrintLevelSummary();
+  ver->Unref();
 }
 
 Version* DBImpl::GetCurrentVersion() {

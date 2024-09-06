@@ -815,11 +815,11 @@ class PosixEnv : public Env {
 
         // if the file has been created for longer than wait_time (learn_trigger_time),
         // we can do CBA analysis. else, wait until the file has lived wait_time
-        time_diff = front.first + adgMod::learn_trigger_time - time_start;
-        if (time_diff > 0) {
-          wait_for_time = true;
-          break;
-        }
+        // time_diff = front.first + adgMod::learn_trigger_time - time_start;
+        // if (time_diff > 0) {
+        //   wait_for_time = true;
+        //   break;
+        // }
 
         learning_prepare.pop();
         double score = adgMod::learn_cb_model->CalculateCB(level, front.second.second->file_size);
@@ -841,15 +841,6 @@ class PosixEnv : public Env {
         adgMod::filelearn_count++;
         learn_pq.pop();
       }
-
-      // if we decide to wait, sleep here
-      if (wait_for_time) {
-        // prepare_queue_mutex.Unlock();
-        SleepForMicroseconds((int) (time_diff / 1000));
-        // prepare_queue_mutex.Lock();
-        wait_for_time = false;
-      }
-    // }
   }
 
   static void PrepareLearnEntryPoint(PosixEnv* env) {

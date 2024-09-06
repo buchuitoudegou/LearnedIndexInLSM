@@ -31,6 +31,12 @@ enum CompressionType {
   kSnappyCompression = 0x1
 };
 
+enum CompactionPolicy {
+  kCompactionStyleLevel = 0x0,
+  kCompactionStyleTier = 0x1,
+  kCompactionStyleLazyLevel = 0x2
+};
+
 // Options to control the behavior of a database (passed to DB::Open)
 struct LEVELDB_EXPORT Options {
   // Create an Options object with default values for all fields.
@@ -142,6 +148,17 @@ struct LEVELDB_EXPORT Options {
   // Many applications will benefit from passing the result of
   // NewBloomFilterPolicy() here.
   const FilterPolicy* filter_policy = NewBloomFilterPolicy(10);
+
+  // const CompactionPolicy compaction_policy = kCompactionStyleLevel;
+  CompactionPolicy compaction_policy = kCompactionStyleLevel;
+
+  uint64_t max_bytes_for_level_base = 10 * 1048576;
+
+  int max_bytes_for_level_multiplier = 10; // T
+
+  int L0_compaction_trigger = 4; // default 4
+
+  int max_logical_level = 4;
 };
 
 // Options that control read operations

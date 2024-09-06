@@ -24,6 +24,8 @@ else (WIN32)
   set(LEVELDB_PLATFORM_NAME LEVELDB_PLATFORM_POSIX)
 endif (WIN32)
 
+find_package(gflags REQUIRED)
+include_directories(${GFLAGS_INCLUDE_DIR})
 
 add_subdirectory(mod/ft)
 add_subdirectory(mod/pgm)
@@ -371,6 +373,9 @@ if(LEVELDB_BUILD_TESTS)
         "${test_file}"
     )
     target_link_libraries("${test_target_name}" leveldb)
+    if (${test_file} MATCHES ".*test_compaction.cc$")
+      target_link_libraries("${test_target_name}" gflags)
+    endif()
     target_compile_definitions("${test_target_name}"
       PRIVATE
         ${LEVELDB_PLATFORM_NAME}=1
@@ -428,6 +433,8 @@ if(LEVELDB_BUILD_TESTS)
     leveldb_test("${PROJECT_SOURCE_DIR}/mod/read.cc")
     leveldb_test("${PROJECT_SOURCE_DIR}/mod/read_cold.cc")
     leveldb_test("${PROJECT_SOURCE_DIR}/mod/gen_dbtrace.cpp")
+    leveldb_test("${PROJECT_SOURCE_DIR}/mod/test_compaction.cc")
+    leveldb_test("${PROJECT_SOURCE_DIR}/mod/printdb.cc")
 
     # TODO(costan): This test also uses
     #               "${PROJECT_SOURCE_DIR}/util/env_{posix|windows}_test_helper.h"

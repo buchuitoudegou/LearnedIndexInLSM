@@ -567,14 +567,6 @@ bool LearnedIndexData::Learned(Version* version, int v_count, int level) {
     return true;
   }
   return false;
-  //        } else {
-  //            if (level_learning_enabled && ++current_seek >= allowed_seek &&
-  //            !learning.exchange(true)) {
-  //                env->ScheduleLearning(&LearnedIndexData::Learn, new
-  //                VersionAndSelf{version, v_count, this, level}, 0);
-  //            }
-  //            return false;
-  //        }
 }
 
 // file model checker, used to be also learning trigger
@@ -588,15 +580,6 @@ bool LearnedIndexData::Learned(Version* version, int v_count,
     return true;
   } else
     return false;
-        //  } else {
-        //      if (file_learning_enabled && (true || level != 0 && level != 1)
-        //       && !learning.exchange(true)) {
-        //         std::cout<<"Checking file model and schedule: "<<learned_not_atomic<< " "<<learned.load()<<std::endl;
-        //          env->ScheduleLearning(( void(*)(void *) )&LearnedIndexData::FileLearn, new
-        //          MetaAndSelf{version, v_count, meta, this, level}, 0);
-        //      }
-        //      return false;
-        //  }
 }
 
 bool LearnedIndexData::FillData(Version* version, FileMetaData* meta) {
@@ -626,10 +609,6 @@ void LearnedIndexData::WriteModel(const string& filename) {
     output_file << "StartAcc"
                 << " " << min_key << " " << max_key << " " << size << " " << level
                 << " " << cost << "\n";
-    // // testing num entires
-    // for (auto& pair : num_entries_accumulated.array) {
-    //   output_file << pair.first << " " << pair.second << "\n";
-    // }
   }
   else if(adgMod::modelmode == 4){
     if(rmi.layer2_size() != 0){
