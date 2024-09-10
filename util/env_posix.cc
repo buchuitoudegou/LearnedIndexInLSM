@@ -171,8 +171,28 @@ class PosixRandomAccessFile final : public RandomAccessFile {
   Status Read(uint64_t offset, size_t n, Slice* result,
               char* scratch) const override {
     int fd = fd_;
+    // O_DIRECT
+    // if (!has_permanent_fd_) {
+    //   fd = ::open(filename_.c_str(), O_RDONLY|O_DIRECT);
+    //   // std::cout<<"status code: "<<fd<<std::endl;
+    //   if (fd < 0) {
+    //     return PosixError(filename_, errno);
+    //   }
+    // }
+    // // std::cout<<"File opened in read(): "<<filename_.c_str()<<std::endl;
+    // // std::cout<<"fd: "<<fd<<std::endl;
+
+    // assert(fd != -1);
+
+    // Status status;
+    // // std::cout<<"n:"<<n<<" offset:"<<offset<<std::endl;
+    // int new_n=n%512?n+(512-n%512):n;
+    // char* temp_scratch=new char[new_n];
+    // ssize_t read_size = ::pread(fd, temp_scratch, new_n, static_cast<off_t>(offset));
+    // memcpy(scratch,temp_scratch,n);
+    // delete[] temp_scratch;
     if (!has_permanent_fd_) {
-      fd = ::open(filename_.c_str(), O_RDONLY|O_DIRECT);
+      fd = ::open(filename_.c_str(), O_RDONLY);
       // std::cout<<"status code: "<<fd<<std::endl;
       if (fd < 0) {
         return PosixError(filename_, errno);
@@ -185,8 +205,7 @@ class PosixRandomAccessFile final : public RandomAccessFile {
 
     Status status;
     // std::cout<<"n:"<<n<<" offset:"<<offset<<std::endl;
-    int new_n=n%512?n+(512-n%512):n;
-    ssize_t read_size = ::pread(fd, scratch, new_n, static_cast<off_t>(offset));
+    ssize_t read_size = ::pread(fd, scratch, n, static_cast<off_t>(offset));
     if (read_size < 0) {
       // An error: return a non-ok status.
       status = PosixError(filename_, errno);
