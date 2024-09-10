@@ -574,6 +574,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       } else {
         right = mid;
       }
+      adgMod::bisearch_depth++;
     }
     auto duration_microsecond = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
     adgMod::bisearch_duration += duration_microsecond;
@@ -804,6 +805,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
         } else {
           right = mid;
         }
+        adgMod::bisearch_depth++;
       }
       afterTime = std::chrono::steady_clock::now();
       duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();
@@ -877,6 +879,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
         else{
           j = mid;
         }
+        adgMod::bisearch_depth++;
       }
 
       // ParsedInternalKey parsed_key;
@@ -1042,6 +1045,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
         } else {
           right = mid;
         }
+        adgMod::bisearch_depth++;
       }
       duration_microsecond = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
       adgMod::bisearch_counter++;
