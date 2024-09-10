@@ -39,6 +39,64 @@ using std::string;
 int num_pairs_base = 1000;
 int mix_base = 20;
 
+int buffer_size = 2*1024*1024;
+int T = 10;
+int num_levels = 5;
+
+leveldb::Options GetLevelingOptions() {
+  leveldb::Options options;
+  options.create_if_missing = true;
+  options.L0_compaction_trigger = 2;
+  options.write_buffer_size = buffer_size;
+  options.max_bytes_for_level_base = buffer_size * T; // size for level 1, default 20MB
+  options.max_bytes_for_level_multiplier = T;
+  options.max_logical_level = num_levels;
+  options.max_file_size = 10 * (1<<20); // 10MB
+
+  
+  leveldb::config::kL0_CompactionTrigger = 2;
+  leveldb::config::kL0_SlowdownWritesTrigger = 2;
+  leveldb::config::kL0_StopWritesTrigger = 4;
+
+  return options;
+}
+
+leveldb::Options GetTieringOptions() {
+  leveldb::Options options;
+  options.create_if_missing = true;
+  options.L0_compaction_trigger = T;
+  options.write_buffer_size = buffer_size;
+  options.max_bytes_for_level_base = buffer_size * T * T; // size for level 1, default 200MB
+  options.max_bytes_for_level_multiplier = T;
+  options.max_logical_level = num_levels;
+  options.max_file_size = 10 * (1<<20); // 10MB
+  options.compaction_policy = leveldb::kCompactionStyleTier;
+
+  leveldb::config::kL0_CompactionTrigger = T;
+  leveldb::config::kL0_SlowdownWritesTrigger = T + 2;
+  leveldb::config::kL0_StopWritesTrigger = T + 4;
+  
+  return options;
+}
+
+leveldb::Options GetLazyLevelOptions() {
+  leveldb::Options options;
+  options.create_if_missing = true;
+  options.L0_compaction_trigger = T;
+  options.write_buffer_size = buffer_size;
+  options.max_bytes_for_level_base = buffer_size * T * T; // size for level 1, default 200MB
+  options.max_bytes_for_level_multiplier = T;
+  options.max_logical_level = num_levels;
+  options.max_file_size = 10 * (1<<20); // 10MB
+  options.compaction_policy = leveldb::kCompactionStyleLazyLevel;
+
+  leveldb::config::kL0_CompactionTrigger = T;
+  leveldb::config::kL0_SlowdownWritesTrigger = T + 2;
+  leveldb::config::kL0_StopWritesTrigger = T + 4;
+  
+  return options;
+}
+
 double get_avg_LevelRead_duration()
 {
     if(LevelRead_counter)
@@ -129,6 +187,7 @@ int main(int argc, char *argv[]) {
     int bpk, model_error;
     int dataset_no, workload_no, exp_no;
     string dataset_name;
+    int compaction_policy;
 
     //0:plr, 1:lipp 2:ft 3.pgm 4.rmi 5.rs 6. plex 7.dili 8. alex
     map<int, string> ModelMap = {
@@ -235,8 +294,9 @@ int main(int argc, char *argv[]) {
             // ("dataset","name of dataset", cxxopts::value<int>(dataset_no)->default_value("0"))
             ("workload","name of workload", cxxopts::value<int>(workload_no)->default_value("0"))
             ("exp","name of workload", cxxopts::value<int>(exp_no)->default_value("0"))
-            ("range", "use range query and specify length", cxxopts::value<int>(length_range)->default_value("0"));
-            ("output", "output key list", cxxopts::value<string>(output)->default_value("key_list.txt"));
+            ("range", "use range query and specify length", cxxopts::value<int>(length_range)->default_value("0"))
+            ("output", "output key list", cxxopts::value<string>(output)->default_value("key_list.txt"))
+            ("compactionpolicy", "LevelDB Compaction Policy", cxxopts::value<int>(compaction_policy)->default_value("0"));
     auto result = commandline_options.parse(argc, argv);
     if (result.count("help")) {
         printf("%s", commandline_options.help().c_str());
@@ -380,7 +440,18 @@ int main(int argc, char *argv[]) {
         ReadOptions& read_options = adgMod::read_options;
         WriteOptions& write_options = adgMod::write_options;
         Status status;
-
+        if(compaction_policy==0) // leveling
+        {
+            options=GetLevelingOptions();
+        }
+        else if (compaction_policy == 1) // tiering
+        {
+            options = GetTieringOptions();
+        }
+        else if (compaction_policy == 2) //lazy leveling
+        {
+            options = GetLazyLevelOptions();
+        }
         options.create_if_missing = true;
         options.filter_policy = leveldb::NewBloomFilterPolicy(bpk);
         options.max_file_size=max_file_size;
@@ -388,6 +459,7 @@ int main(int argc, char *argv[]) {
             options.max_file_size=block_size;
         options.block_size = block_size;
         options.write_buffer_size=write_buffer_size;
+        options.compaction_policy=static_cast<leveldb::CompactionPolicy>(compaction_policy);
         cout<<"Block size: "<<options.block_size<<endl;
         cout<<"Table size: "<<options.max_file_size<<endl;
         cout<<"Write buffer size: "<<options.write_buffer_size<<endl;

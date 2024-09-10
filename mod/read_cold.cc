@@ -38,7 +38,63 @@ int num_pairs_base = 1000;
 int mix_base = 20;
 
 
+int buffer_size = 4*1024*1024;
+int T = 10;
+int num_levels = 5;
 
+leveldb::Options GetLevelingOptions() {
+  leveldb::Options options;
+  options.create_if_missing = true;
+  options.L0_compaction_trigger = 2;
+  options.write_buffer_size = buffer_size;
+  options.max_bytes_for_level_base = buffer_size * T; // size for level 1, default 20MB
+  options.max_bytes_for_level_multiplier = T;
+  options.max_logical_level = num_levels;
+  options.max_file_size = 10 * (1<<20); // 10MB
+
+  
+  leveldb::config::kL0_CompactionTrigger = 2;
+  leveldb::config::kL0_SlowdownWritesTrigger = 2;
+  leveldb::config::kL0_StopWritesTrigger = 4;
+
+  return options;
+}
+
+leveldb::Options GetTieringOptions() {
+  leveldb::Options options;
+  options.create_if_missing = true;
+  options.L0_compaction_trigger = T;
+  options.write_buffer_size = buffer_size;
+  options.max_bytes_for_level_base = buffer_size * T * T; // size for level 1, default 200MB
+  options.max_bytes_for_level_multiplier = T;
+  options.max_logical_level = num_levels;
+  options.max_file_size = 10 * (1<<20); // 10MB
+  options.compaction_policy = leveldb::kCompactionStyleTier;
+
+  leveldb::config::kL0_CompactionTrigger = T;
+  leveldb::config::kL0_SlowdownWritesTrigger = T + 2;
+  leveldb::config::kL0_StopWritesTrigger = T + 4;
+  
+  return options;
+}
+
+leveldb::Options GetLazyLevelOptions() {
+  leveldb::Options options;
+  options.create_if_missing = true;
+  options.L0_compaction_trigger = T;
+  options.write_buffer_size = buffer_size;
+  options.max_bytes_for_level_base = buffer_size * T * T; // size for level 1, default 200MB
+  options.max_bytes_for_level_multiplier = T;
+  options.max_logical_level = num_levels;
+  options.max_file_size = 10 * (1<<20); // 10MB
+  options.compaction_policy = leveldb::kCompactionStyleLazyLevel;
+
+  leveldb::config::kL0_CompactionTrigger = T;
+  leveldb::config::kL0_SlowdownWritesTrigger = T + 2;
+  leveldb::config::kL0_StopWritesTrigger = T + 4;
+  
+  return options;
+}
 class NumericalComparator : public Comparator {
 public:
     NumericalComparator() = default;
@@ -104,6 +160,7 @@ int main(int argc, char *argv[]) {
     int bpk, model_error;
     int dataset_no, workload_no, exp_no;
     string dataset_name;
+    int compaction_policy,inputlen;
 
     //0:plr, 1:lipp 2:ft 3.pgm 4.rmi 5.rs 6. plex 7.dili 8. alex
     map<int, string> ModelMap = {
@@ -200,10 +257,12 @@ int main(int argc, char *argv[]) {
             ("lippmode", "lipp*", cxxopts::value<int>(adgMod::lipp_mode)->default_value("0"))
             ("dataset","name of dataset", cxxopts::value<string>(dataset_name)->default_value("Unknown"))
             // ("dataset","name of dataset", cxxopts::value<int>(dataset_no)->default_value("0"))
+            ("inputlen","if >0, limits the number of input keys and disables reading", cxxopts::value<int>(inputlen)->default_value("0"))
             ("workload","name of workload", cxxopts::value<int>(workload_no)->default_value("0"))
             ("exp","name of workload", cxxopts::value<int>(exp_no)->default_value("0"))
-            ("range", "use range query and specify length", cxxopts::value<int>(length_range)->default_value("0"));
-            ("output", "output key list", cxxopts::value<string>(output)->default_value("key_list.txt"));
+            ("range", "use range query and specify length", cxxopts::value<int>(length_range)->default_value("0"))
+            ("output", "output key list", cxxopts::value<string>(output)->default_value("key_list.txt"))
+            ("compactionpolicy", "LevelDB Compaction Policy", cxxopts::value<int>(compaction_policy)->default_value("0"));
     auto result = commandline_options.parse(argc, argv);
     if (result.count("help")) {
         printf("%s", commandline_options.help().c_str());
@@ -235,6 +294,7 @@ int main(int argc, char *argv[]) {
     vector<int> ycsb_is_write;
     //keys.reserve(100000000000 / adgMod::value_size);
     if (!input_filename.empty()) {
+        cout<<"input file: "<<input_filename<<endl;
         ifstream input(input_filename);
         uint64_t key;
         string op;
@@ -248,6 +308,8 @@ int main(int argc, char *argv[]) {
             // std::cout<<the_key<<std::endl;
             keys.push_back(std::move(the_key));
             // break;
+            if(keys.size()==inputlen)
+                break;
         }
         //adgMod::key_size = (int) keys.front().size();
     } else {
@@ -335,13 +397,26 @@ int main(int argc, char *argv[]) {
         WriteOptions& write_options = adgMod::write_options;
         Status status;
 
+        buffer_size = block_size;
+        if(compaction_policy==0) // leveling
+        {
+            options=GetLevelingOptions();
+        }
+        else if (compaction_policy == 1) // tiering
+        {
+            options = GetTieringOptions();
+        }
+        else if (compaction_policy == 2) //lazy leveling
+        {
+            options = GetLazyLevelOptions();
+        }
         options.create_if_missing = true;
         options.filter_policy = leveldb::NewBloomFilterPolicy(bpk);
-        options.max_file_size=max_file_size;
-        if(options.max_file_size<block_size)
-            options.max_file_size=block_size;
-        options.block_size = block_size;
-        options.write_buffer_size=write_buffer_size;
+        // options.max_file_size=max_file_size;
+        // if(options.max_file_size<block_size)
+        //     options.max_file_size=block_size;
+        // options.block_size = block_size;
+        // options.write_buffer_size=write_buffer_size;
         cout<<"Block size: "<<options.block_size<<endl;
         cout<<"Table size: "<<options.max_file_size<<endl;
         cout<<"Write buffer size: "<<options.write_buffer_size<<endl;
@@ -415,174 +490,173 @@ int main(int argc, char *argv[]) {
             res.open("/home/jiarui/LearnedIndexInLSM/evaluation/" + expname + ".out",std::ios::out|std::ios::app);
             res<<"bloom filter size: "<<bloom_size<<endl;
             res.close();
-            return 0;
+            if(inputlen>0)
+                return 0;
+
+{
+            status = DB::Open(options, db_location, &db);
+            adgMod::db->WaitForBackground();
+            cout << "Repoened" << endl;
+            auto TrainTimeStart = std::chrono::steady_clock::now();
+            if (adgMod::MOD == 6 || adgMod::MOD == 7 || adgMod::MOD == 9) {
+                Version* current = adgMod::db->versions_->current();
+
+                // offline level learning
+                // for (int i = 1; i < config::kNumLevels; ++i) {
+                //     LearnedIndexData::LevelLearn(new VersionAndSelf{current, adgMod::db->version_count, current->learned_index_data_[i].get(), i});
+                // }
+
+                // offline file learning
+                cout << "File Learning..." << endl;
+                current->FileLearn();
+                cout << "File Learn complete..." << endl;
+            }
+            auto TrainTimeEnd = std::chrono::steady_clock::now();
+            double TrainTimeMicro = std::chrono::duration<double, std::micro>(TrainTimeEnd - TrainTimeStart).count();
+            file_data->Report();
+            // adgMod::learn_cb_model->Report();
+            cout << "Shutting down" << endl;
+            adgMod::db->WaitForBackground();
+            delete db;
+
+            status = DB::Open(options, db_location, &db);
+            assert(status.ok() && "Open Error");
+            adgMod::db->WaitForBackground();
 
 
-
-
-// {
-//             status = DB::Open(options, db_location, &db);
-//             adgMod::db->WaitForBackground();
-//             cout << "Repoened" << endl;
-//             auto TrainTimeStart = std::chrono::steady_clock::now();
-//             if (adgMod::MOD == 6 || adgMod::MOD == 7 || adgMod::MOD == 9) {
-//                 Version* current = adgMod::db->versions_->current();
-
-//                 // offline level learning
-//                 // for (int i = 1; i < config::kNumLevels; ++i) {
-//                 //     LearnedIndexData::LevelLearn(new VersionAndSelf{current, adgMod::db->version_count, current->learned_index_data_[i].get(), i});
-//                 // }
-
-//                 // offline file learning
-//                 cout << "File Learning..." << endl;
-//                 current->FileLearn();
-//                 cout << "File Learn complete..." << endl;
-//             }
-//             auto TrainTimeEnd = std::chrono::steady_clock::now();
-//             double TrainTimeMicro = std::chrono::duration<double, std::micro>(TrainTimeEnd - TrainTimeStart).count();
-//             file_data->Report();
-//             // adgMod::learn_cb_model->Report();
-//             cout << "Shutting down" << endl;
-//             adgMod::db->WaitForBackground();
-//             delete db;
-
-//             status = DB::Open(options, db_location, &db);
-//             assert(status.ok() && "Open Error");
-//             adgMod::db->WaitForBackground();
-
-
-//             cout << "Repoened" << endl;
-//             vector<double> results;
+            cout << "Repoened" << endl;
+            vector<double> results;
 
             
 
-//             for(int j=0; j<1; j++){
-//                 // cout<<"In multi read"<<endl;
-//                 int hit_times = 0;
-//                 int get_times = 0;
-//                 // adgMod::db->WaitForBackground();
-//                 adgMod::db->WaitForBackground();
-//                 delete db;
-//                 status = DB::Open(options, db_location, &db);
-//                 adgMod::db->WaitForBackground();
+            for(int j=0; j<1; j++){
+                // cout<<"In multi read"<<endl;
+                int hit_times = 0;
+                int get_times = 0;
+                // adgMod::db->WaitForBackground();
+                adgMod::db->WaitForBackground();
+                delete db;
+                status = DB::Open(options, db_location, &db);
+                adgMod::db->WaitForBackground();
 
-//                 cout << "Ready to read" << endl;
-//                 auto ReadTimeStart = std::chrono::steady_clock::now();
-//                 string value;
-//                 for(int i=0; i<keys_read.size(); i++){
-//                 // for(int i=0; i<500; i++){
-//                     if(i%100000 == 0){
-//                         cout<<i<<" "<<keys_read[i].first<<" "<<keys_read[i].second<<endl;
-//                     }
+                cout << "Ready to read" << endl;
+                auto ReadTimeStart = std::chrono::steady_clock::now();
+                string value;
+                for(int i=0; i<keys_read.size(); i++){
+                // for(int i=0; i<500; i++){
+                    if(i%100000 == 0){
+                        cout<<i<<" "<<keys_read[i].first<<" "<<keys_read[i].second<<endl;
+                    }
                     
-//                     string option = keys_read[i].first;
-//                     if(option == "READ"){
-//                         // cout<<"Reading!"<<endl;
-//                         get_times++;
-//                         status = db->Get(read_options, keys_read[i].second, &value);
-//                     if (status.ok()) {
-//                             hit_times++;
-//                             // cout<<"Non zero!"<<endl;
-//                         }
-//                         if (!status.ok()) {
-//                             cout << keys_read[i].second << " Not Found" << endl;
-//                             assert(status.ok() && "File Get Error");
-//                         }
-//                     }
-//                     else if(option == "INSERT"){
-//                         status = db->Put(write_options, keys_read[i].second, {values.data() + uniform_dist_value(e2), (uint64_t) adgMod::value_size});
-//                     }
-//                     else if(option == "SCAN"){
-//                         // std::cout<<"operation "<<i<<" doing scan"<<std::endl;
-//                         Iterator* db_iter = length_range == 0 ? nullptr : db->NewIterator(read_options);
-//                         db_iter->Seek(keys_read[i].second);
-//                         // Range
-//                         for (int r = 0; r < length_range; ++r) {
-//                             if (!db_iter->Valid()) break;
-//                             Slice key = db_iter->key();
-//                             string value = db_iter->value().ToString();
-//                             // cout << key.ToString() << value << endl;
-//                             // value.clear();
-//                             db_iter->Next();
-//                         }
-//                         delete db_iter;
-//                     }
+                    string option = keys_read[i].first;
+                    if(option == "READ"){
+                        // cout<<"Reading!"<<endl;
+                        get_times++;
+                        status = db->Get(read_options, keys_read[i].second, &value);
+                    if (status.ok()) {
+                            hit_times++;
+                            // cout<<"Non zero!"<<endl;
+                        }
+                        if (!status.ok()) {
+                            cout << keys_read[i].second << " Not Found" << endl;
+                            assert(status.ok() && "File Get Error");
+                            return -1;
+                        }
+                    }
+                    else if(option == "INSERT"){
+                        status = db->Put(write_options, keys_read[i].second, {values.data() + uniform_dist_value(e2), (uint64_t) adgMod::value_size});
+                    }
+                    else if(option == "SCAN"){
+                        // std::cout<<"operation "<<i<<" doing scan"<<std::endl;
+                        Iterator* db_iter = length_range == 0 ? nullptr : db->NewIterator(read_options);
+                        db_iter->Seek(keys_read[i].second);
+                        // Range
+                        for (int r = 0; r < length_range; ++r) {
+                            if (!db_iter->Valid()) break;
+                            Slice key = db_iter->key();
+                            string value = db_iter->value().ToString();
+                            // cout << key.ToString() << value << endl;
+                            // value.clear();
+                            db_iter->Next();
+                        }
+                        delete db_iter;
+                    }
                     
-//                 }
-//                 auto ReadTimeEnd = std::chrono::steady_clock::now();
-//                 double ReadTimeMicro = std::chrono::duration<double, std::micro>(ReadTimeEnd - ReadTimeStart).count();
-//                 ReadDuration = ReadTimeMicro;
-//                 // cout<<"ReadDuration: "<<ReadDuration<<endl;
-//                 results.push_back(ReadDuration);
-//                 cout<<"Hit times: "<<hit_times<<" Get times: "<<get_times<<endl;
-//                 // sleep(1);
-//                 // adgMod::learn_cb_model->Report();
-//             }
+                }
+                auto ReadTimeEnd = std::chrono::steady_clock::now();
+                double ReadTimeMicro = std::chrono::duration<double, std::micro>(ReadTimeEnd - ReadTimeStart).count();
+                ReadDuration = ReadTimeMicro;
+                // cout<<"ReadDuration: "<<ReadDuration<<endl;
+                results.push_back(ReadDuration);
+                cout<<"Hit times: "<<hit_times<<" Get times: "<<get_times<<endl;
+                // sleep(1);
+                // adgMod::learn_cb_model->Report();
+            }
 
-//             double ReadTimesum = accumulate(begin(results), end(results), 0.0);  
-//             double ReadTimeMean =  ReadTimesum / results.size();
+            double ReadTimesum = accumulate(begin(results), end(results), 0.0);  
+            double ReadTimeMean =  ReadTimesum / results.size();
 
-//             // sleep(20);
+            // sleep(20);
             
 
-//             // res.open("../evaluation/bpk_hit/readres.txt",std::ios::out|std::ios::app);
-//             // res<<"Bits per key: "<< bpk<< " Readtime: "<<mean<<endl;
+            // res.open("../evaluation/bpk_hit/readres.txt",std::ios::out|std::ios::app);
+            // res<<"Bits per key: "<< bpk<< " Readtime: "<<mean<<endl;
 
             
             
-//             // return 0;
+            // return 0;
 
-//             cout<<"Read complete"<<endl;
+            cout<<"Read complete"<<endl;
 
-//             // file_data->Report();
-//             // cout << "Level model stats:" << endl;
-//             Version* current = adgMod::db->versions_->current();
-//             // for (int i = 1; i < config::kNumLevels; ++i) {
-//             //     current->learned_index_data_[i]->ReportStats();
-//             // }
+            // file_data->Report();
+            // cout << "Level model stats:" << endl;
+            Version* current = adgMod::db->versions_->current();
+            // for (int i = 1; i < config::kNumLevels; ++i) {
+            //     current->learned_index_data_[i]->ReportStats();
+            // }
 
-//             // int total_keys = 0;
-//             // leveldb::Iterator* it = db->NewIterator(read_options);
-//             // // cout<<it->status().ToString()<<endl;
-//             // it->SeekToFirst();
-//             // cout<<it->key().ToString()<<endl;
-//             // for (; it->Valid(); it->Next()) {
-//             //     if (!it->Valid()) break;
-//             //     // cout<<total_keys<<endl;
-//             //     total_keys++;
-//             // }
+            // int total_keys = 0;
+            // leveldb::Iterator* it = db->NewIterator(read_options);
+            // // cout<<it->status().ToString()<<endl;
+            // it->SeekToFirst();
+            // cout<<it->key().ToString()<<endl;
+            // for (; it->Valid(); it->Next()) {
+            //     if (!it->Valid()) break;
+            //     // cout<<total_keys<<endl;
+            //     total_keys++;
+            // }
 
-//             // delete it;
-//             adgMod::MOD = MOD;
+            // delete it;
+            adgMod::MOD = MOD;
 
-//             // cout<<"There are "<< total_keys <<" keys in db."<<endl;
+            // cout<<"There are "<< total_keys <<" keys in db."<<endl;
 
-//             // int BFsize = total_keys * bpk / 8;
-//             // cout<<"Bloom filter size is "<< BFsize <<" Byte."<<endl;
+            // int BFsize = total_keys * bpk / 8;
+            // cout<<"Bloom filter size is "<< BFsize <<" Byte."<<endl;
 
-//             int FencePointersize = ((options.max_file_size / options.block_size) +1) * key_size /2*3;
-//             current = adgMod::db->versions_->current();
-//             int file_num = current->GetFileNum();
-//             FencePointersize *= file_num; 
-//             cout<<"Fence Pointer size is "<< FencePointersize <<" Byte."<<endl;
+            int FencePointersize = ((options.max_file_size / options.block_size) +1) * key_size /2*3;
+            current = adgMod::db->versions_->current();
+            int file_num = current->GetFileNum();
+            FencePointersize *= file_num; 
+            cout<<"Fence Pointer size is "<< FencePointersize <<" Byte."<<endl;
 
 
-//             long long int size_byte = adgMod::file_data->Getmodelsize();
-//             cout<<"Learned/LIPP index size is "<< size_byte <<" Byte."<<endl;
+            long long int size_byte = adgMod::file_data->Getmodelsize();
+            cout<<"Learned/LIPP index size is "<< size_byte <<" Byte."<<endl;
 
-//             // Managing outputs
+            // Managing outputs
 
-//             string modelname = ModelMap[adgMod::modelmode];
-//             string datasetname = DatasetMap[dataset_no];
-//             string workloadname = WorkloadMap[workload_no];
-//             // string expname = ExpMap[exp_no];
+            string modelname = ModelMap[adgMod::modelmode];
+            string datasetname = DatasetMap[dataset_no];
+            string workloadname = WorkloadMap[workload_no];
+            // string expname = ExpMap[exp_no];
 
-//             string exptag = modelname + "_" + datasetname + "_" + workloadname + "_" + std::to_string(length_range);
+            string exptag = modelname + "_" + datasetname + "_" + workloadname + "_" + std::to_string(length_range);
 
-//             // std::fstream res;
-//             res.setf(std::ios::fixed,std::ios::floatfield);
-//             res.open("../evaluation/" + expname + ".out",std::ios::out|std::ios::app);
-//             res<<exptag<<","<< TrainTimeMicro<<","<<ReadTimeMean<<","<<size_byte<<","<<adgMod::LoadModelDuration<<std::endl;}
+            // std::fstream res;
+            res.setf(std::ios::fixed,std::ios::floatfield);
+            res.open("../evaluation/" + expname + ".out",std::ios::out|std::ios::app);
+            res<<exptag<<","<< TrainTimeMicro<<","<<ReadTimeMean<<","<<size_byte<<","<<adgMod::LoadModelDuration<<std::endl;}
 
 
 
