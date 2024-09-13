@@ -412,11 +412,11 @@ int main(int argc, char *argv[]) {
         }
         options.create_if_missing = true;
         options.filter_policy = leveldb::NewBloomFilterPolicy(bpk);
-        // options.max_file_size=max_file_size;
+        options.max_file_size=max_file_size;
         // if(options.max_file_size<block_size)
         //     options.max_file_size=block_size;
-        // options.block_size = block_size;
-        // options.write_buffer_size=write_buffer_size;
+        options.block_size = block_size;
+        options.write_buffer_size=write_buffer_size;
         cout<<"Block size: "<<options.block_size<<endl;
         cout<<"Table size: "<<options.max_file_size<<endl;
         cout<<"Write buffer size: "<<options.write_buffer_size<<endl;

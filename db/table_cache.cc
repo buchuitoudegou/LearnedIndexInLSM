@@ -666,6 +666,12 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // auto beforeTime = std::chrono::steady_clock::now();
       int c = 0;
       bool found = model->ft.lookup(search_key, &c, &v);
+      adgMod::bisearch_duration += 1.0 * model->ft.search_time / 1000;
+      adgMod::bisearch_counter++;
+      adgMod::prediction_counter++;
+      adgMod::prediction_duration += 1.0 * model->ft.predict_time / 1000;
+      model->ft.search_time = 0;
+      model->ft.predict_time = 0;
       // std::cout<<"pred v:"<<v<<std::endl;
       // auto afterTime = std::chrono::steady_clock::now();
       // double duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();

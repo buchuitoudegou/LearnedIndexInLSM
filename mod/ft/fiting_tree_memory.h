@@ -4,6 +4,7 @@
 #include "storage_management.h"
 #include <algorithm>
 #include <cstring>
+#include <chrono>
 #include "pgm_seg.h"
 #include "stx/btree_multimap.h"
 
@@ -164,6 +165,8 @@ typedef struct {
 
 class FITingTree {
     public:
+        double predict_time = 0;
+        double search_time = 0;
         #if Disk
         StorageManager *sm;
         MetaNode metanode;
@@ -709,6 +712,7 @@ class FITingTree {
         bool found = false;
         int last_block = -1;
         char *_data2 = new char[MaxNodeSize];
+        auto start_time = std::chrono::high_resolution_clock::now();
         while (start <= end) {
             int mid = start + (end - start) / 2;
             int _block = mid / ItermCountOneBlock;
@@ -723,6 +727,8 @@ class FITingTree {
             } else if (_temp[_offset].key < key) start = mid + 1;
             else end = mid - 1;
         }
+        auto end_time = std::chrono::high_resolution_clock::now();
+        search_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
 
         if (!found && item_buffer > 0) {
             int _block = (item_count+2) / ItermCountOneBlock;
@@ -804,7 +810,10 @@ class FITingTree {
             }
         #endif
         #if PGMSegment
+        auto start_time = std::chrono::high_resolution_clock::now();
         int pos = int64_t(lnids[i].slope * (key- lnids[i].key)) + lnids[i].intercept;
+        auto end_time = std::chrono::high_resolution_clock::now();
+        predict_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
         #else
         int pos = int(lnids[i].slope * (key - lnids[i].key));
         #endif
@@ -1377,7 +1386,10 @@ class FITingTree {
             LeafNodeValueOnDisk lfv = it.data();
 
             #if PGMSegment
+            auto start_time = std::chrono::high_resolution_clock::now();
             int pos = int64_t(lfv.slope * (key- it.key())) + lfv.intercept;
+            auto end_time = std::chrono::high_resolution_clock::now();
+            predict_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
             #else
             int pos = int(lfv.slope * (key - it.key()));
             #endif
@@ -1476,6 +1488,7 @@ class FITingTree {
         *block_count += 1;
 
         bool is_inner = data[0] == FInnerNodeType;
+        auto start_time = std::chrono::high_resolution_clock::now();
         while (is_inner) {
             InnerNodeHeaderOnDisk *inhd;
             inhd = (InnerNodeHeaderOnDisk *)data;
@@ -1523,9 +1536,13 @@ class FITingTree {
                 if (lnids[i].key <= key && lnids[i+1].key > key) break;
             }
         #endif
-
+        auto end_time = std::chrono::high_resolution_clock::now();
+        search_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
         #if PGMSegment
+        auto start_time2 = std::chrono::high_resolution_clock::now();
         int pos = int64_t(lnids[i].slope * (key- lnids[i].key)) + lnids[i].intercept;
+        auto end_time2 = std::chrono::high_resolution_clock::now();
+        predict_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end_time2 - start_time2).count();
         #else
         int pos = int(lnids[i].slope * (key - lnids[i].key));
         #endif
