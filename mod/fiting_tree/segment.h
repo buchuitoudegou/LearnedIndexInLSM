@@ -30,6 +30,18 @@ public:
      */
     Ft_Segment(KeyType start_key, PosType start_pos, KeyType end_key, Floating slope) : start_key(start_key), start_pos(start_pos), end_key(end_key), slope(slope){};
 
+    // deserialization
+    Ft_Segment(char* buffer){
+        char* ptr = buffer;
+        memcpy(&start_key, ptr, sizeof(KeyType));
+        ptr += sizeof(KeyType);
+        memcpy(&start_pos, ptr, sizeof(PosType));
+        ptr += sizeof(PosType);
+        memcpy(&end_key, ptr, sizeof(KeyType));
+        ptr += sizeof(KeyType);
+        memcpy(&slope, ptr, sizeof(Floating));
+    }
+
     /**
      * Returns the smallest key in the segment
      * @return the smallest key 
@@ -56,6 +68,22 @@ public:
     inline bool operator<(const KeyType &k)
     {
         return start_key < k;
+    }
+
+    void serialize(char* buffer){
+        size_t size = get_size();
+        // std::cout<<sizeof(KeyType)<<" "<<sizeof(PosType)<<" "<<sizeof(Floating)<<std::endl;
+        char* ptr = buffer;
+        memcpy(ptr, &start_key, sizeof(KeyType));
+        ptr += sizeof(KeyType);
+        memcpy(ptr, &start_pos, sizeof(PosType));
+        ptr += sizeof(PosType);
+        memcpy(ptr, &end_key, sizeof(KeyType));
+        ptr += sizeof(KeyType);
+        memcpy(ptr, &slope, sizeof(Floating));
+    }
+    size_t get_size(){
+        return sizeof(KeyType) * 2 + sizeof(PosType) + sizeof(Floating);
     }
 };
 

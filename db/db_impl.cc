@@ -638,7 +638,7 @@ int DBImpl::CompactMemTable() {
 
     // std::cout<<"Prepare Learning"<<std::endl;
 
-    env_->PrepareLearning(time.second, level, new FileMetaData(edit.new_files_[0].second));
+    // env_->PrepareLearning(time.second, level, new FileMetaData(edit.new_files_[0].second));
 
 
 
@@ -1041,10 +1041,12 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
   // When a new file is generated, it's put into learning_prepare queue.
   // env_->PrepareLearning((__rdtscp(&dummy) - instance->initial_time) / adgMod::reference_frequency, level, meta);
 
-  if (adgMod::MOD == 6) {
+  if (adgMod::MOD >= 6) {
     assert(keys != nullptr);
     adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(meta->number);
     model->LearnFileNew(*keys);
+    string filename = adgMod::db_name+"/"+std::to_string(meta->number)+".fmodel";
+    model->WriteLearnedModelNew(filename);
   }
 
   if (s.ok() && current_entries > 0) {

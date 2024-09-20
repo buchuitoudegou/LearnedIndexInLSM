@@ -13,7 +13,7 @@
 #include <utility>
 #include <iostream>
 #include <string>
-#include "mod/pgm/include/pgm/pgm_index.hpp"
+#include "mod/pgm/pgm_index.hpp"
 #include "util/mutexlock.h"
 // #include <mod/lipp/core/storage_management.h>
 #include "mod/PLEX/include/ts/ts.h"
@@ -245,7 +245,7 @@ bool LearnedIndexData::Learn(string filename) {
     ft.bulk_load_pgm(data, count, data2.begin(), data2.end(), error);
   }
   else if (adgMod::modelmode == 3){
-    pgm::PGMIndex<uint64_t, PGM_Error, 4> index(keys.begin(), keys.end());
+    pgm::PGMIndex<uint64_t> index(keys.begin(), keys.end(),error,4);
     pgm = index;
     learned.store(true);
   }
@@ -390,12 +390,12 @@ bool LearnedIndexData::Learn(string filename) {
     char* index_name_p = (char*)index_name.data();
     char* data_name_p = (char*)data_name.data();
     int count = string_keys.size();
-    std::vector<long long> keys;
+    std::vector<uint64_t> keys;
     for (auto it : string_keys)
     {
       keys.push_back(stoll(it.first));
     }
-    FitingTree<long long> ft(keys,error);
+    FitingTree<uint64_t> ft(keys,error);
     ft_index = ft;
   }
   learned.store(true);
@@ -469,7 +469,6 @@ uint64_t LearnedIndexData::FileLearn(void* arg) {
   self->level = mas->level;
 
   FileMetaData* meta = mas->meta;
-  string fimename = std::to_string(meta->number);
 
   // std::cout<<"Learning File:"<<fimename<<std::endl;
 
@@ -478,7 +477,15 @@ uint64_t LearnedIndexData::FileLearn(void* arg) {
   c->Ref();
   if (self->FillData(c, mas->meta)) {
     // std::cout<<"Data Filled"<<std::endl;
-    self->Learn(fimename);
+    // self->Learn(filename);
+    std::vector<uint64_t> keys;
+    for(auto &it:self->string_keys)
+    {
+      keys.push_back(stoll(it.first));
+    }
+    self->LearnFileNew(keys);
+    string filename = adgMod::db_name+"/"+std::to_string(meta->number)+".fmodel";
+    self->WriteLearnedModelNew(filename);
     entered = true;
   } else {
     // std::cout<<"Data NOT Filled"<<std::endl;
@@ -1190,15 +1197,26 @@ uint64_t AccumulatedNumEntriesArray::NumEntries() const {
 }
 
 void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys) {
-  if (adgMod::modelmode == 3) {
+  if (adgMod::modelmode == 2)
+  {
+    FitingTree<uint64_t> ft(keys, error);
+    ft_index = ft;
+  }
+  else if (adgMod::modelmode == 3) {
     // pgm
-    pgm::PGMIndex<uint64_t, PGM_Error, 4> index(keys.begin(), keys.end());
+    pgm::PGMIndex<uint64_t> index(keys.begin(), keys.end(),error,4);
     pgm = index;
   }
+
 }
 
 void LearnedIndexData::WriteLearnedModelNew(const std::string& filename) {
-  if (adgMod::modelmode == 3) {
+  if (adgMod::modelmode == 2)
+  {
+    std::ofstream output_file(filename,std::ios_base::binary);
+    // todo
+  }
+  else if (adgMod::modelmode == 3) {
     // pgm
     std::string index_name = filename;
     std::ofstream output_file(index_name);
