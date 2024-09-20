@@ -170,7 +170,7 @@ bool LearnedIndexData::Learn(string filename) {
 
     learned.store(true);
     // string_keys.clear();
-    return true;
+    // return true;
   }
   else if(adgMod::modelmode == 1){
     // std::cout<<"LIPP learning"<<std::endl;
@@ -202,10 +202,10 @@ bool LearnedIndexData::Learn(string filename) {
     for(int i=0; i<count; i++){
       if(i>0 && keys[i] <= keys[i-1]) std::cout<<"Get reverse keys"<<std::endl;
     }
-    // cout<<"dup check done"<<endl;
+
     lipp_index.bulk_load_disk(keys, values, count);
     learned.store(true);
-    return true;
+    // return true;
   }
   else if(adgMod::modelmode == 2){
     string index_name = adgMod::db_name + "/" + filename + ".fmodel";
@@ -397,8 +397,11 @@ bool LearnedIndexData::Learn(string filename) {
     string mirror_dir = adgMod::db_name + "/" + filename + ".mirror";
     dili.set_mirror_dir(mirror_dir);
     dili.bulk_load(bulk_load_data_);
+    auto start = std::chrono::steady_clock::now();
     dili.save(index_name);
-
+    auto end = std::chrono::steady_clock::now();
+    double duration = std::chrono::duration<double, std::micro>(end - start).count();
+    adgMod::write_model_duration+=duration;
   }
   else if(adgMod::modelmode == 8){
     string index_name = adgMod::db_name + "/" + filename + "_idx.fmodel";
@@ -441,7 +444,30 @@ bool LearnedIndexData::Learn(string filename) {
     index.sync_metanode(false);
     alex_index = index;
   }
+  else if(adgMod::modelmode == 9)
+  {
+    string index_name = adgMod::db_name + "/" + filename + "_idx.fmodel";
+    string data_name = adgMod::db_name + "/" + filename + "_dat.fmodel";
+    char* index_name_p = (char*)index_name.data();
+    char* data_name_p = (char*)data_name.data();
+    int count = string_keys.size();
+    std::vector<long long> keys;
+    for (auto it : string_keys)
+    {
+      keys.push_back(stoll(it.first));
+    }
+    FitingTree<long long> ft(keys,error);
+    ft_index = ft;
+  }
   learned.store(true);
+  if(!adgMod::fresh_write)
+  {
+    auto start=std::chrono::steady_clock::now();
+    db->versions_->current()->WriteLevelModel();
+    auto end = std::chrono::steady_clock::now();
+    double duration = std::chrono::duration<double, std::micro>(end - start).count();
+    adgMod::write_model_duration+=duration;
+  }
   return true;
 
 }
@@ -609,6 +635,7 @@ void LearnedIndexData::WriteModel(const string& filename) {
     output_file << "StartAcc"
                 << " " << min_key << " " << max_key << " " << size << " " << level
                 << " " << cost << "\n";
+    output_file.close();
   }
   else if(adgMod::modelmode == 4){
     if(rmi.layer2_size() != 0){

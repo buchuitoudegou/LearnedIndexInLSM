@@ -780,7 +780,11 @@ void DBImpl::BackgroundCall() {
     auto start_timer=std::chrono::steady_clock::now();
     BackgroundCompaction();
     auto end_timer=std::chrono::steady_clock::now();
-    adgMod::compaction_duration+=std::chrono::duration<double, std::micro>(end_timer - start_timer).count();
+    if (!adgMod::fresh_write) 
+    {
+      adgMod::compaction_duration +=std::chrono::duration<double, std::micro>(end_timer - start_timer).count();
+      adgMod::compaction_count++;
+    }
   }
 
   background_compaction_scheduled_ = false;
@@ -855,7 +859,8 @@ void DBImpl::BackgroundCompaction() {
         status.ToString().c_str(), versions_->LevelSummary(&tmp));
   } else {
     // cout<<"Compaction input size: "<<c->get_input_size()<<endl;
-    adgMod::compaction_size_inputs+=c->get_input_size();
+    if(!adgMod::fresh_write)
+      adgMod::compaction_size_inputs+=c->get_input_size();
     CompactionState* compact = new CompactionState(c);
     status = DoCompactionWork(compact);
     if (!status.ok()) {
@@ -1031,7 +1036,8 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
   meta->largest = output->largest;
 
   // cout<<"New file size: "<<meta->file_size<<endl;
-  adgMod::compaction_size_outputs+=meta->file_size;
+  if (!adgMod::fresh_write)
+    adgMod::compaction_size_outputs+=meta->file_size;
   // When a new file is generated, it's put into learning_prepare queue.
   env_->PrepareLearning((__rdtscp(&dummy) - instance->initial_time) / adgMod::reference_frequency, level, meta);
 

@@ -23,7 +23,7 @@
 #include "mod/DILI/src/dili/DILI.h"
 #include "mod/ALEX/src/core/alex.h"
 #include "plr.h"
-
+#include "mod/fiting_tree/fiting_tree.h"
 
 
 using std::string;
@@ -111,7 +111,7 @@ namespace adgMod {
         ts::TrieSpline<long long int> ts;
         DILI dili;
         alex::Alex<long long int, int> alex_index;
-
+        FitingTree<long long> ft_index;
     public:
         // all keys in the file/level to be leraned from 
         // <key, tag> 0: normal key 1: first key of a datablock 2: last key of a block

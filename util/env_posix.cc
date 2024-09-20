@@ -842,8 +842,9 @@ class PosixEnv : public Env {
 
         learning_prepare.pop();
         double score = adgMod::learn_cb_model->CalculateCB(level, front.second.second->file_size);
-        std::cout<<"Score: "<<score<<" const_size_to_cost: "<<CBModel_Learn::const_size_to_cost<<std::endl;
-        if (score > CBModel_Learn::const_size_to_cost) learn_pq.push(std::make_pair(score, front));
+        // std::cout<<"Score: "<<score<<" const_size_to_cost: "<<CBModel_Learn::const_size_to_cost<<std::endl;
+        if (score > CBModel_Learn::const_size_to_cost || true) 
+          learn_pq.push(std::make_pair(score, front));
       }
 
       // items in learn_pq is ranked by its CBA score, larger meaning that
@@ -867,6 +868,7 @@ class PosixEnv : public Env {
   }
 
   void PrepareLearning(uint64_t time_start, int level, FileMetaData* meta) {
+    if (!adgMod::fresh_write)adgMod::newSST_count++;
     if (adgMod::fresh_write || (adgMod::MOD != 6 && adgMod::MOD != 7 && adgMod::MOD != 9)) return;
     // MutexLock guard(&prepare_queue_mutex);
     // if (!preparing_thread_started) {
@@ -881,8 +883,7 @@ class PosixEnv : public Env {
     auto start_time=std::chrono::steady_clock::now();
     PrepareLearn();
     auto end_time=std::chrono::steady_clock::now();
-    adgMod::learn_duration+=std::chrono::duration<double, std::micro>(start_time - end_time).count();
-    adgMod::newSST_count++;
+    adgMod::learn_duration+=std::chrono::duration<double, std::micro>(end_time - start_time).count();
   }
 
 

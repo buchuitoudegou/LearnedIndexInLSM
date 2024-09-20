@@ -34,6 +34,7 @@ add_subdirectory(mod/radixspline)
 add_subdirectory(mod/PLEX)
 add_subdirectory(mod/DILI)
 add_subdirectory(mod/ALEX)
+add_subdirectory(mod/fiting_tree)
 
 option(LEVELDB_BUILD_TESTS "Build LevelDB's unit tests" ON)
 option(LEVELDB_BUILD_BENCHMARKS "Build LevelDB's benchmarks" ON)

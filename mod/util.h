@@ -154,6 +154,10 @@ namespace adgMod {
     extern double compaction_duration;
     extern size_t compaction_size_inputs;
     extern size_t compaction_size_outputs;
+    extern double write_model_duration;
+    extern double index_block_time;
+    extern double blockreader_create_time;
+    extern double blockreader_bisearch_time;
 
     // some util functions
     uint64_t ExtractInteger(const char* pos, size_t size);

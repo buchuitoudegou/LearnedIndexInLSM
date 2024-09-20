@@ -303,6 +303,9 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
+    if(db_location.back()!='/')
+        db_location+='/';
+
     std::default_random_engine e1(0), e2(255), e3(0);
     srand(0);
     num_operations *= num_pairs_base;
@@ -440,6 +443,7 @@ int main(int argc, char *argv[]) {
         ReadOptions& read_options = adgMod::read_options;
         WriteOptions& write_options = adgMod::write_options;
         Status status;
+        buffer_size=write_buffer_size;
         if(compaction_policy==0) // leveling
         {
             options=GetLevelingOptions();
@@ -455,8 +459,8 @@ int main(int argc, char *argv[]) {
         options.create_if_missing = true;
         options.filter_policy = leveldb::NewBloomFilterPolicy(bpk);
         options.max_file_size=max_file_size;
-        if(options.max_file_size<block_size)
-            options.max_file_size=block_size;
+        // if(options.max_file_size<block_size)
+        //     options.max_file_size=block_size;
         options.block_size = block_size;
         options.write_buffer_size=write_buffer_size;
         options.compaction_policy=static_cast<leveldb::CompactionPolicy>(compaction_policy);
@@ -651,59 +655,19 @@ int main(int argc, char *argv[]) {
                 // sleep(1);
                 // adgMod::learn_cb_model->Report();
             }
-
+            adgMod::db->WaitForBackground();
             double OPTimesum = accumulate(begin(results), end(results), 0.0);  
             double OPTimeMean =  OPTimesum / results.size();
 
-            // sleep();
-            
-
-            // res.open("../evaluation/bpk_hit/readres.txt",std::ios::out|std::ios::app);
-            // res<<"Bits per key: "<< bpk<< " Readtime: "<<mean<<endl;
-
-            
-            
-            // return 0;
-
             cout<<"Read complete"<<endl;
-
-            // file_data->Report();
-            // cout << "Level model stats:" << endl;
             current = adgMod::db->versions_->current();
-            // for (int i = 1; i < config::kNumLevels; ++i) {
-            //     current->learned_index_data_[i]->ReportStats();
-            // }
-
-            //problem here
-            // int total_keys = 0;
-            // leveldb::Iterator* it = db->NewIterator(read_options);
-            // // cout<<it->status().ToString()<<endl;
-            // it->SeekToFirst();
-            // cout<<it->key().ToString()<<endl;
-            // for (; it->Valid(); it->Next()) {
-            //     if (!it->Valid()) break;
-            //     // cout<<total_keys<<endl;
-            //     total_keys++;
-            // }
-
-            // delete it;
-            // adgMod::MOD = MOD;
-
-            // cout<<"There are "<< total_keys <<" keys in db."<<endl;
-
-            // int BFsize = total_keys * bpk / 8;
-            // cout<<"Bloom filter size is "<< BFsize <<" Byte."<<endl;
-
-            // int FencePointersize = ((options.max_file_size / options.block_size) +1) * key_size /2*3;
-            // current = adgMod::db->versions_->current();
-            // int file_num = current->GetFileNum();
-            // FencePointersize *= file_num; 
-            // cout<<"Fence Pointer size is "<< FencePointersize <<" Byte."<<endl;
-
+            int FencePointersize = ((options.max_file_size / options.block_size) +1) * key_size /2*3;
+            int file_num = current->GetFileNum();
+            FencePointersize *= file_num; 
 
             long long int size_byte = adgMod::file_data->Getmodelsize();
             cout<<"Learned/LIPP index size is "<< size_byte <<" Byte."<<endl;
-
+            
             // Managing outputs
 
             string modelname = ModelMap[adgMod::modelmode];
@@ -722,6 +686,10 @@ int main(int argc, char *argv[]) {
             {
                 modelname=modelname+"-"+std::to_string(alex_node_size);
             }
+            if(MOD==0)
+            {
+                modelname="FencePointer-"+std::to_string(block_size);
+            }
             // string datasetname = DatasetMap[dataset_no];
             // string workloadname = WorkloadMap[workload_no];
             string expname = ExpMap[exp_no];
@@ -731,6 +699,19 @@ int main(int argc, char *argv[]) {
             std::fstream res;
             res.setf(std::ios::fixed,std::ios::floatfield);
             res.open("/home/jiarui/LearnedIndexInLSM/evaluation/" + expname + ".out",std::ios::out|std::ios::app);
+            
+            cout << "bloom filter size: " << bloom_size << " fence pointer size: "<< FencePointersize << " index size: "<< size_byte << endl;
+            cout << exptag << "\t" << filelearn_count << "/" << newSST_count
+                 << " " << write_model_duration << "/" << learn_duration << "/"
+                 << compaction_duration << "\t" << compaction_count << "\t"
+                 << compaction_size_outputs << "/" << compaction_size_inputs
+                 << endl;
+            res << "bloom filter size: " << bloom_size << " fence pointer size: "<< FencePointersize << " index size: "<< size_byte << endl;
+            res << exptag << "\t" << filelearn_count << "/" << newSST_count
+                << " " << write_model_duration << "/" << learn_duration << "/"
+                << compaction_duration << "\t" << compaction_count << "\t"
+                << compaction_size_outputs << "/" << compaction_size_inputs
+                << endl;
             res << exptag << "\t" << TrainTimeMicro << "\t"
                 << OPTimeMean / NUM_OP << "\t" << size_byte << "\t"
                 << adgMod::LoadModelDuration / NUM_RELOAD << "\t"
@@ -752,40 +733,10 @@ int main(int argc, char *argv[]) {
                 << WriteDuration / write_times << "\t"
                 << 1.0*bisearch_depth/bisearch_counter<< endl;
 
-            // cout<<learn_duration/filelearn_count<<endl;
-
-            cout << adgMod::filelearn_count << "/" << newSST_count << " "
-                 << adgMod::compaction_size_inputs << " "
-                 << compaction_size_outputs << " " << compaction_duration << " "
-                 << compaction_count << endl;
-            res << adgMod::filelearn_count << "/" << newSST_count << " "
-                << adgMod::compaction_size_inputs << " "
-                << compaction_size_outputs << " " << compaction_duration << " "
-                << compaction_count << endl;
-            // res<<1.0*bisearch_depth/bisearch_counter<<endl;
-            // res<<" Bloom filter size is "<< BFsize <<" Byte.";
-            // res<<" Learned index size is "<< size_byte <<" Byte.";
-            // res<<" Fence Pointer size is "<< FencePointersize <<" Byte.";
-            // res<<" Total size is "<< (FencePointersize + size_byte +
-            // BFsize)/1024 <<" KB.";
-
-            // res<<" Memtable time:"<<adgMod::MemtableDuration/results.size();
-            // res<<" Level model time:"<<adgMod::FindFileDuration/results.size();
-            // res<<" File model time:"<<adgMod::FileModelDuration/results.size();
-            
-
-            // res<<"\n\tGet file time:"<<adgMod::getfiled/results.size();
-            // res<<" Predict position time:"<<adgMod::getposd/results.size();
-            // res<<" Calculate block time:"<<adgMod::calblkd/results.size();
-            // res<<" Bloom Filter time:"<<adgMod::filterd/results.size();
-            // res<<" Read block time:"<<adgMod::readblkd/results.size();
-            // res<<" Binary search time:"<<adgMod::binsearchd/results.size();
-            // res<<" Get value time:"<<adgMod::GetvalueDuration/results.size()<<endl;
-            // res<<" gv1 time:"<<adgMod::gv1d/results.size();
-            // res<<" gv2 time:"<<adgMod::gv2d/results.size();
-    
-            
-            adgMod::db->WaitForBackground();
+            // res << index_block_time << " " << blockreader_create_time << " "
+            //     << blockreader_bisearch_time << endl;
+            // cout << index_block_time << " " << blockreader_create_time << " "
+            //      << blockreader_bisearch_time << endl;
             delete db;
         }
     }

@@ -90,8 +90,12 @@ class StorageManager {
 
     private:
         void write_data(void *data, long offset, int len) {
+            auto start = std::chrono::steady_clock::now();
             fseek(fp, offset, SEEK_SET);
             fwrite(data, len, 1, fp);
+            auto end = std::chrono::steady_clock::now();
+            double duration = std::chrono::duration<double, std::micro>(end - start).count();
+            adgMod::write_model_duration+=duration;
             return;
         }
 
@@ -103,8 +107,12 @@ class StorageManager {
         }
 
         void write_block(void *data, int block_id) {
+            auto start = std::chrono::steady_clock::now();
             fseek(fp, block_id * BLOCK_SIZE, SEEK_SET);
             fwrite(data, BLOCK_SIZE, 1, fp);
+            auto end = std::chrono::steady_clock::now();
+            double duration = std::chrono::duration<double, std::micro>(end - start).count();
+            adgMod::write_model_duration+=duration;
             return;
         }
 
@@ -1163,7 +1171,7 @@ class StorageManager {
                     block1 = itd->comp.addr.block;
                     offset1 = itd->comp.addr.offset;
                 } else {
-                    printf("wroing\n");
+                    printf("wrong\n");
                 }
             }
 
