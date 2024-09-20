@@ -320,9 +320,10 @@ void Table::FillData(const ReadOptions& options, adgMod::LearnedIndexData* data)
     int num_entries_this_block = 0;
     bool first_key_flag = true;
     for (block_iter->SeekToRestartPoint(0); block_iter->ParseNextKey(); ++num_entries_this_block) {
-
+      ParseInternalKey(block_iter->key(), &parsed_key);
+      // used for new learning methods
+      data->keys.push_back(std::stoll(parsed_key.user_key.ToString()));
       if(adgMod::nofence == 1){
-        ParseInternalKey(block_iter->key(), &parsed_key);
         if(first_key_flag){
           data->string_keys.emplace_back(std::make_pair(std::string(parsed_key.user_key.data(), parsed_key.user_key.size()), 1));
           // std::cout<<"string_keys number "<<num_entries_this_block<<" out of "<<num_points+num_entries_this_block<<" emplace_back as 1:"<<std::string(parsed_key.user_key.data(), parsed_key.user_key.size())<<std::endl;
@@ -335,7 +336,6 @@ void Table::FillData(const ReadOptions& options, adgMod::LearnedIndexData* data)
         
       }
       else if(adgMod::nofence == 2){
-        ParseInternalKey(block_iter->key(), &parsed_key);
         if(first_key_flag){
           data->string_keys.emplace_back(std::make_pair(std::string(parsed_key.user_key.data(), parsed_key.user_key.size()), 1));
           // std::cout<<"string_keys number "<<num_entries_this_block<<" out of "<<num_points+num_entries_this_block<<" emplace_back as 1:"<<std::string(parsed_key.user_key.data(), parsed_key.user_key.size())<<std::endl;
@@ -347,7 +347,6 @@ void Table::FillData(const ReadOptions& options, adgMod::LearnedIndexData* data)
         }
       }
       else{
-        ParseInternalKey(block_iter->key(), &parsed_key);
         // std::cout<<parsed_key.user_key.data()<<" || "<<parsed_key.user_key.size()<<std::endl;
         // std::cout<<"string_keys emplace_back:"<<std::string(parsed_key.user_key.data(), parsed_key.user_key.size())<<std::endl;
         // std::string copy_str(parsed_key.user_key.data(), parsed_key.user_key.size())

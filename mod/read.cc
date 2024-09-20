@@ -713,6 +713,16 @@ int main(int argc, char *argv[]) {
             }else if(modelmode==3)
             {
                 modelname=modelname+"-"+std::to_string(PGM_internal_Error);
+                auto all_indexs = adgMod::file_data->file_learned_index_data;
+                uint32_t total_segments = 0;
+                int file_cnt = 0;
+                for (auto& index : all_indexs) {
+                    if (index != nullptr) {
+                        file_cnt ++;
+                        total_segments += index->pgm.segments_count();
+                    }
+                }
+                std::cout << "PGM Index Segments: " << 1.0*total_segments / file_cnt << std::endl;
             }
             else if(modelmode==1)
             {

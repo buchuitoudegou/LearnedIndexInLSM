@@ -669,9 +669,13 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       adgMod::bisearch_duration += 1.0 * model->ft.search_time / 1000;
       adgMod::bisearch_counter++;
       adgMod::prediction_counter++;
+      adgMod::prediction_range +=  model->ft.leaf_node_search_range;
+      adgMod::bisearch_depth += model->ft.leaf_node_search_depth;
       adgMod::prediction_duration += 1.0 * model->ft.predict_time / 1000;
       model->ft.search_time = 0;
       model->ft.predict_time = 0;
+      model->ft.leaf_node_search_range= 0;
+      model->ft.leaf_node_search_depth = 0;
       // std::cout<<"pred v:"<<v<<std::endl;
       // auto afterTime = std::chrono::steady_clock::now();
       // double duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();
@@ -714,7 +718,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // std::cout<<"Now query:"<<adgMod::SliceToInteger(parsed_key.user_key)<<std::endl;
       long long int search_key = stoll(parsed_key.user_key.ToString());
       auto beforeTime = std::chrono::steady_clock::now();
-      pgm::ApproxPos range = model->pgm.pgmsearch(search_key);
+      pgm::ApproxPos range = model->pgm.search(search_key);
       auto afterTime = std::chrono::steady_clock::now();
       double duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();
       adgMod::prediction_duration+=duration_microsecond;
@@ -1230,160 +1234,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
 
     }
     else if(adgMod::modelmode == 8){
-      // std::cout<<"good"<<std::endl;
-      int v = 0;
-      ParsedInternalKey parsed_key;
-      ParseInternalKey(k, &parsed_key);
-      // std::cout<<"Target key:"<<parsed_key.user_key.ToString()<<std::endl;
-      lippKeyType search_key = stoll(parsed_key.user_key.ToString());
-      // std::cout<<"search_key:"<<search_key<<std::endl;
-      adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(meta->number);
-
-      // auto beforeTime = std::chrono::steady_clock::now();
-      bool found = model->alex_index.get_leaf_disk(search_key, &v);
-      // auto afterTime = std::chrono::steady_clock::now();
-      // double duration_microsecond = std::chrono::duration<double, std::micro>(afterTime - beforeTime).count();
-      // adgMod::getposd += duration_microsecond;
-      // std::cout<<"found:"<<found<<std::endl;
-      // std::cout<<"pred v:"<<v<<std::endl;
-      uint64_t real_num_entries = model->real_num_entries;
-      // std::cout<<"file name: "<<meta->number<<" search_key: "<<search_key<<" pred v: "<< v <<" real num entries: "<< int(model->real_num_entries) <<std::endl;
-
-      if(adgMod::alex_interval != 1){
-
       
-
-      // std::cout<<"pred v:"<< v <<" real num entries: "<< int(real_num_entries) << std::endl;
-
-      v = std::max(std::min(v, int(real_num_entries)),  0);
-
-      lower = std::max(v - adgMod::alex_interval, 0);
-      upper = std::min(v + adgMod::alex_interval, int(real_num_entries));
-
-      // std::cout<<"lower: "<<lower<<" upper: "<<upper<<std::endl;
-
-      size_t index_lower = lower / adgMod::block_num_entries;
-      size_t index_upper = upper / adgMod::block_num_entries;
-
-      uint64_t i = index_lower;
-      uint64_t j = index_upper;
-      // printf("index lower by learned index: %lu, there are %lu entries in a block\n", i, adgMod::block_num_entries);
-      // std::cout<<"i:"<<i<<" index_upper:"<<index_upper<<std::endl;
-      
-      while (i < j) { //Check
-        //
-        // std::cout<<"Entered!"<<std::endl;
-        size_t mid = (i + j) / 2;
-        Block* index_block = tf->table->rep_->index_block;
-        uint32_t mid_index_entry = DecodeFixed32((index_block->data_) + (index_block->restart_offset_) + mid * sizeof(uint32_t));
-        uint32_t shared, non_shared, value_length;
-        const char* key_ptr = DecodeEntry(index_block->data_ + mid_index_entry,
-                                          index_block->data_ + index_block->restart_offset_, &shared, &non_shared, &value_length);
-        //
-        assert(key_ptr != nullptr && shared == 0 && "Index Entry Corruption");
-        // std::cout<<key_ptr<<" "<<non_shared<<std::endl;
-        Slice mid_key(key_ptr, non_shared);
-        // std::cout<<"Midkey: "<<mid_key.ToString()<<" "<<k.ToString()<<std::endl;
-
-        int comp = tf->table->rep_->options.comparator->Compare(mid_key, k);
-        // i = comp < 0 ? index_upper : index_lower;
-        //comp<0 意味着  |lower...mid| ... |upper...key...| mid<k
-        if(comp<0){
-          i = mid + 1;
-        }
-        else{
-          j = mid;
-        }
-      }
-
-      // ParsedInternalKey parsed_key;
-      ParseInternalKey(k, &parsed_key);
-      uint64_t block_offset = i * adgMod::block_size;
-
-      if (filter != nullptr && !filter->KeyMayMatch(block_offset, k)) {
-        cache_->Release(cache_handle);
-        // std::cout<<"Key:"<<adgMod::SliceToInteger(parsed_key.user_key)<<"rejected by filter"<<std::endl;
-        return;
-      }
-      // adgMod::filterd += adgMod::filtere - adgMod::filterb;
-
-      // Get the interval within the data block that the target key may lie in
-      size_t pos_block_lower = i == index_lower ? lower % adgMod::block_num_entries : 0;
-      size_t pos_block_upper = i == index_upper ? upper % adgMod::block_num_entries : adgMod::block_num_entries - 1;
-
-      // std::cout<<"Key:"<<adgMod::SliceToInteger(parsed_key.user_key)<<"bisearch bound:"<< pos_block_lower<<" "<<pos_block_upper<<std::endl;
-      size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
-      // printf("here is read size: %zu, and entry entries: %lu\n", pos_block_upper - pos_block_lower + 1, adgMod::entry_size);
-      // printf("blockoffset: %lu\n", block_offset);
-      // static char scratch[81920];
-      Slice entries;
-      s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
-      assert(s.ok());
-
-      uint64_t left = pos_block_lower, right = pos_block_upper;
-      // std::cout<<right - left<<std::endl;
-      while (left < right) {
-        // std::cout<<right - left<<std::endl;
-        uint32_t mid = (left + right) / 2;
-        uint32_t shared, non_shared, value_length;
-        const char* key_ptr = DecodeEntry(entries.data() + (mid - pos_block_lower) * adgMod::entry_size,
-                entries.data() + read_size, &shared, &non_shared, &value_length);
-        assert(key_ptr != nullptr && shared == 0 && "Entry Corruption");
-        Slice mid_key(key_ptr, non_shared);
-        // std::cout<<"Midkey: "<<mid_key.ToString()<<std::endl;
-        int comp = tf->table->rep_->options.comparator->Compare(mid_key, k);
-        if (comp < 0) {
-          left = mid + 1;
-        } else {
-          right = mid;
-        }
-      }
-
-      // decode the target entry to get the key and value (actually value_addr)
-      uint32_t shared, non_shared, value_length;
-      const char* key_ptr = DecodeEntry(entries.data() + (left - pos_block_lower) * adgMod::entry_size,
-              entries.data() + read_size, &shared, &non_shared, &value_length);
-      assert(key_ptr != nullptr && shared == 0 && "Entry Corruption");
-      Slice key(key_ptr, non_shared), value(key_ptr + non_shared, value_length);
-      handle_result(arg, key, value);
-      cache_->Release(cache_handle);
-
-      }
-      else{
-        if(v<0) v = 0;
-        if(v>real_num_entries) v = real_num_entries-1;
-
-        // std::cout<<"v_later:"<<v<<std::endl;
-
-        //determine block
-        size_t block_idx = v / adgMod::block_num_entries;
-        uint64_t block_offset = block_idx * adgMod::block_size;
-
-        size_t relative_idx = block_idx == 0 ? v : v % adgMod::block_num_entries;
-
-        Slice entries;
-        // uint64_t offset =  v * adgMod::entry_size;
-        static char scratch[4096];
-        // s = file->Read(offset, adgMod::entry_size, &entries, scratch);
-        s = file->Read(block_offset + relative_idx * adgMod::entry_size, adgMod::entry_size, &entries, scratch);
-
-
-        // Slice entries;
-        // uint64_t offset =  v * adgMod::entry_size;
-        // static char scratch[4096];
-        // s = file->Read(offset, adgMod::entry_size, &entries, scratch);
-        uint32_t shared, non_shared, value_length;
-        // std::cout<<"data: "<<entries.ToString()<<std::endl;
-        const char* key_ptr = DecodeEntry(entries.data(),
-                entries.data() + adgMod::entry_size, &shared, &non_shared, &value_length);
-        Slice key(key_ptr, non_shared), value(key_ptr + non_shared, value_length);
-        // std::cout<<"reskey: "<<key.ToString()<<std::endl;
-        handle_result(arg, key, value);
-        cache_->Release(cache_handle);
-      }
-
-      
-
     }
     auto duration=std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now()-start_time).count();
     adgMod::LevelRead_duration+=duration;

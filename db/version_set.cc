@@ -1912,8 +1912,8 @@ namespace leveldb {
         for (int i = 0; i < config::kNumLevels; ++i) {
             learned_index_data_[i]->WriteModel(vset_->dbname_ + "/" + to_string(i) + ".model");
             for (FileMetaData *file_meta : files_[i]) {
-                adgMod::file_data->GetModel(file_meta->number)->WriteModel(
-                        vset_->dbname_ + "/" + to_string(file_meta->number) + ".fmodel");
+                adgMod::file_data->GetModel(file_meta->number)->WriteLearnedModelNew(
+                    vset_->dbname_ + "/" + to_string(file_meta->number) + ".fmodel");
             }
         }
     }
@@ -1927,8 +1927,8 @@ namespace leveldb {
 
             for (FileMetaData *file_meta : files_[i]) {
                 if (adgMod::load_file_model) {
-                    adgMod::file_data->GetModel(file_meta->number)->ReadModel(
-                            vset_->dbname_ + "" + to_string(file_meta->number) + ".fmodel");
+                    adgMod::file_data->GetModel(file_meta->number)->LoadLearnedModelNew(
+                        vset_->dbname_ + "" + to_string(file_meta->number) + ".fmodel");
                 }
                 file_max = file_max > file_meta->number ? file_max : file_meta->number;
             }

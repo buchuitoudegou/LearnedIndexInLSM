@@ -105,7 +105,7 @@ namespace adgMod {
         StorageManager<lippKeyType, lippValueType> lipp_index;
         //fitting tree
         ft::FITingTree ft;
-        pgm::MappedPGMIndex<long long int, PGM_Error, PGM_internal_Error> pgm;
+        pgm::PGMIndex<uint64_t, PGM_Error, 4> pgm;
         rmi::RmiLAbs<long long int, rmi::LinearSpline, rmi::LinearRegression> rmi;
         rs::RadixSpline<long long int> rs;
         ts::TrieSpline<long long int> ts;
@@ -116,6 +116,8 @@ namespace adgMod {
         // all keys in the file/level to be leraned from 
         // <key, tag> 0: normal key 1: first key of a datablock 2: last key of a block
         std::vector<std::pair<std::string, int>> string_keys;
+
+        std::vector<uint64_t> keys;
         // std::vector<std::string> string_keys;
         // only used in level models
         AccumulatedNumEntriesArray num_entries_accumulated;
@@ -161,6 +163,11 @@ namespace adgMod {
         // writing this model to disk and load this model from disk
         void WriteModel(const string& filename);
         void ReadModel(const string& filename);
+
+        // learn a single file (used in compaction)
+        void LearnFileNew(const std::vector<uint64_t>& keys);
+        void WriteLearnedModelNew(const std::string& filenum);
+        void LoadLearnedModelNew(const std::string& filenum);
         
         // print model stats
         void ReportStats();
@@ -174,7 +181,7 @@ namespace adgMod {
 
     // an array storing all file models and provide similar access interface with multithread protection
     class FileLearnedIndexData {
-    private:
+    public:
         leveldb::port::Mutex mutex;
         std::vector<LearnedIndexData*> file_learned_index_data;
     public:

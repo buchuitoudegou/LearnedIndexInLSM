@@ -978,7 +978,7 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
 }
 
 Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
-                                          Iterator* input) {
+                                          Iterator* input, std::vector<uint64_t>* keys) {
   assert(compact != nullptr);
   assert(compact->outfile != nullptr);
   assert(compact->builder != nullptr);
@@ -1033,7 +1033,13 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
   // cout<<"New file size: "<<meta->file_size<<endl;
   adgMod::compaction_size_outputs+=meta->file_size;
   // When a new file is generated, it's put into learning_prepare queue.
-  env_->PrepareLearning((__rdtscp(&dummy) - instance->initial_time) / adgMod::reference_frequency, level, meta);
+  // env_->PrepareLearning((__rdtscp(&dummy) - instance->initial_time) / adgMod::reference_frequency, level, meta);
+
+  if (adgMod::MOD == 6) {
+    assert(keys != nullptr);
+    adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(meta->number);
+    model->LearnFileNew(*keys);
+  }
 
   if (s.ok() && current_entries > 0) {
     // Verify that the table is usable
@@ -1115,6 +1121,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   bool has_current_user_key = false;
   SequenceNumber last_sequence_for_key = kMaxSequenceNumber;
 
+  std::vector<uint64_t> keys;
 
   for (; input->Valid() && !shutting_down_.load(std::memory_order_acquire);) {
     // Prioritize immutable compaction work
@@ -1198,11 +1205,13 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       }
       compact->current_output()->largest.DecodeFrom(key);
       compact->builder->Add(key, input->value());
+      keys.push_back(std::stoll(key.ToString()));
 
       // Close output file if it is big enough
       if (compact->builder->FileSize() >=
           compact->compaction->MaxOutputFileSize()) {
-        status = FinishCompactionOutputFile(compact, input);
+        status = FinishCompactionOutputFile(compact, input, &keys);
+        keys.clear();
         if (!status.ok()) {
           break;
         }
@@ -1216,7 +1225,8 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
     status = Status::IOError("Deleting DB during compaction");
   }
   if (status.ok() && compact->builder != nullptr) {
-    status = FinishCompactionOutputFile(compact, input);
+    status = FinishCompactionOutputFile(compact, input, &keys);
+    keys.clear();
   }
   if (status.ok()) {
     status = input->status();
