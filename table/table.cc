@@ -202,11 +202,11 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
 
 Iterator* Table::NewIterator(const ReadOptions& options, int file_num, RandomAccessFile* file) const {
   // std::cout<<"Generating Table iter: "<<file<<" "<<adgMod::MOD<<std::endl;
-  if (file != nullptr && (adgMod::MOD == 6 || adgMod::MOD == 7)) {
-    adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(file_num);
-    // std::cout<<"Generating learned iter: "<<std::endl;
-    if (model->Learned()) return new LearnedIterator(const_cast<Table*>(this), file, model, file_num);
-  }
+  // if (file != nullptr && (adgMod::MOD == 6 || adgMod::MOD == 7)) {
+  //   adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(file_num);
+  //   // std::cout<<"Generating learned iter: "<<std::endl;
+  //   if (model->Learned()) return new LearnedIterator(const_cast<Table*>(this), file, model, file_num);
+  // }
   return NewTwoLevelIterator(
       rep_->index_block->NewIterator(rep_->options.comparator),
       &Table::BlockReader, const_cast<Table*>(this), options);
@@ -390,16 +390,8 @@ void Table::FillData(const ReadOptions& options, adgMod::LearnedIndexData* data)
         //Here!!
         adgMod::block_size = temp.size() + kBlockTrailerSize;
     }
-    // testing num entires
-    // uint64_t current_total = data->num_entries_accumulated.NumEntries();
-    // if (!data->Learned()) {
-    //     data->num_entries_accumulated.Add(current_total + num_entries_this_block, std::string(parsed_key.user_key.data(), parsed_key.user_key.size()));
-    // }
     delete block_iter;
   }
-  // std::cout<<"Switching table"<<std::endl;
-  // printf("nums in this table is: %lu\n",num_points );
-  // data->num_entries_accumulated.Add(num_points, "");
   data->filled = true;
   delete index_iter;
 }

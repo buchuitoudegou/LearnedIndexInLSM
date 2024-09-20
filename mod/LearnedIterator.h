@@ -20,13 +20,10 @@ class LearnedIterator : public Iterator {
 
   virtual void Seek(const Slice& target) {
 		adgMod::Stats* instance = adgMod::Stats::GetInstance();
-    // std::cout<<"using learned iter do range query"<<std::endl;
 
 		// read the model
 		ParsedInternalKey parsed_key;
     ParseInternalKey(target, &parsed_key);
-    // std::cout<<"parsed_key:"<<parsed_key.user_key.ToString()<<std::endl;
-    // std::cout<<"file_name:"<<file_num<<std::endl;
 
     if(adgMod::modelmode == 0){
       
@@ -579,9 +576,7 @@ class LearnedIterator : public Iterator {
 
   void ReadDataBlock() {
     uint64_t read_size = current_block == num_blocks - 1 ? last_block_num_entries : adgMod::block_num_entries;
-    // std::cout<<"read_size:"<<read_size<<std::endl;
     read_size *= adgMod::entry_size;
-    // std::cout<<"read_size:"<<read_size<<" current block:"<<current_block<<" block_size:"<<adgMod::block_size<<std::endl;
     if (scratch == nullptr) {
       scratch = new char[read_size];
     }

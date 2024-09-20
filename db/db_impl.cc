@@ -533,7 +533,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
 }
 
 Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
-                                Version* base) {
+                                Version* base, std::vector<uint64_t>* keys) {
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
@@ -546,7 +546,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Status s;
   {
     mutex_.Unlock();
-    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
+    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta, keys);
     mutex_.Lock();
   }
 
@@ -590,23 +590,19 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
 }
 
 int DBImpl::CompactMemTable() {
-  // std::cout<<"Compacting memtables no para"<<std::endl;
   mutex_.AssertHeld();
-//  assert(false);
-// std::cout<<"Before assert"<<std::endl;
   assert(imm_ != nullptr);
-  // std::cout<<"After assert"<<std::endl;
-    adgMod::Stats* instance = adgMod::Stats::GetInstance();
-    instance->StartTimer(16);
+  adgMod::Stats* instance = adgMod::Stats::GetInstance();
+  instance->StartTimer(16);
 
   // Save the contents of the memtable as a new Table
   VersionEdit edit;
   Version* base = versions_->current();
   base->Ref();
-  Status s = WriteLevel0Table(imm_, &edit, base);
+  std::vector<uint64_t> keys;
+  Status s = WriteLevel0Table(imm_, &edit, base, &keys);
   base->Unref();
 
-  // std::cout<<s.ToString()<<std::endl;
 
   if (s.ok() && shutting_down_.load(std::memory_order_acquire)) {
     s = Status::IOError("Deleting DB during memtable compaction");
@@ -629,16 +625,20 @@ int DBImpl::CompactMemTable() {
     RecordBackgroundError(s);
   }
 
-    auto time = instance->PauseTimer(16, true);
-    int level = edit.new_files_[0].first;
-    adgMod::compaction_counter_mutex.Lock();
-    adgMod::events[0].push_back(new CompactionEvent(time, to_string(level)));
-    adgMod::levelled_counters[5].Increment(edit.new_files_[0].first, time.second - time.first);
-    adgMod::compaction_counter_mutex.Unlock();
+  auto time = instance->PauseTimer(16, true);
+  int level = edit.new_files_[0].first;
+  adgMod::compaction_counter_mutex.Lock();
+  adgMod::events[0].push_back(new CompactionEvent(time, to_string(level)));
+  adgMod::levelled_counters[5].Increment(edit.new_files_[0].first, time.second - time.first);
+  adgMod::compaction_counter_mutex.Unlock();
 
-    // std::cout<<"Prepare Learning"<<std::endl;
-
-    // env_->PrepareLearning(time.second, level, new FileMetaData(edit.new_files_[0].second));
+  if (adgMod::MOD >= 6) {
+    for (auto& new_file : edit.new_files_) {
+      adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(new_file.second.number);
+      model->LearnFileNew(keys);
+      model->WriteLearnedModelNew(dbname_ + "/" + to_string(new_file.second.number) + ".fmodel");
+    }
+  }
 
 
 
@@ -1045,8 +1045,7 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
     assert(keys != nullptr);
     adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(meta->number);
     model->LearnFileNew(*keys);
-    string filename = adgMod::db_name+"/"+std::to_string(meta->number)+".fmodel";
-    model->WriteLearnedModelNew(filename);
+    model->WriteLearnedModelNew(dbname_ + "/" + to_string(meta->number) + ".fmodel");
   }
 
   if (s.ok() && current_entries > 0) {
