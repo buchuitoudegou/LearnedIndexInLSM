@@ -166,7 +166,7 @@ class LearnedIterator : public Iterator {
       ParseInternalKey(target, &parsed_key);
       // std::cout<<"Now query:"<<adgMod::SliceToInteger(parsed_key.user_key)<<std::endl;
       long long int search_key = stoll(parsed_key.user_key.ToString());
-      pgm::ApproxPos range = file_model->pgm.pgmsearch(search_key);
+      pgm::ApproxPos range = file_model->pgm.search(search_key);
       // std::cout<<"file name:"<<meta->number<<std::endl;
       // std::cout<<"file_name:"<<file_num<<std::endl;
       // std::cout<<"pos: "<<range.pos<<" lo:"<<range.lo<<" hi:"<<range.hi<<std::endl;

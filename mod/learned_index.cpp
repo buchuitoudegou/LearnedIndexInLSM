@@ -245,32 +245,9 @@ bool LearnedIndexData::Learn(string filename) {
     ft.bulk_load_pgm(data, count, data2.begin(), data2.end(), error);
   }
   else if (adgMod::modelmode == 3){
-    string index_name = adgMod::db_name + "/" + filename + ".fmodel";
-    char * index_name_p = &index_name[0];
-    int count = string_keys.size();
-    real_num_entries = count;
-    std::vector<long long int> data;
-    // for(int i=0; i<count; i++){
-    //   data.push_back(stoll(string_keys[i].first));
-    // }
-
-    long long last_key = 0;
-    for(int i=0; i<count; i++){
-        long long thiskey = stoll(string_keys[i].first);
-        if(i>0 && last_key >= thiskey){
-          data.push_back(last_key +1);
-          // cout<<"turns "<<last_key<<" to "<<keys[i]<<endl;
-        }
-        else{
-          data.push_back(thiskey);
-        }
-        last_key = data[i];
-    }
-
-
-    pgm::MappedPGMIndex<long long, PGM_Error, PGM_internal_Error> pgm_(data.begin(), data.end(), index_name);
-    pgm = pgm_;
-
+    pgm::PGMIndex<uint64_t, PGM_Error, 4> index(keys.begin(), keys.end());
+    pgm = index;
+    learned.store(true);
   }
 
   else if (adgMod::modelmode == 4){
@@ -404,45 +381,7 @@ bool LearnedIndexData::Learn(string filename) {
     adgMod::write_model_duration+=duration;
   }
   else if(adgMod::modelmode == 8){
-    string index_name = adgMod::db_name + "/" + filename + "_idx.fmodel";
-    string data_name = adgMod::db_name + "/" + filename + "_dat.fmodel";
-    char* index_name_p = (char*)index_name.data();
-    char* data_name_p = (char*)data_name.data();
-    int count = string_keys.size();
-    real_num_entries = count;
-    // auto values = new std::pair<long long, int>[count];
-    int interval_count = int(std::ceil(static_cast<double>(string_keys.size()) / adgMod::alex_interval));
-    auto values = new std::pair<long long, int>[interval_count+1];
-    // for (int i = 0; i < count; i++) {
-    //     values[i].first = stoll(string_keys[i].first);
-    //     values[i].second = static_cast<int>(i);
-    // }
-
-    long long last_key = 0;
-    int interal_count = 0;
-    for(int i=0; i<count; i+=adgMod::alex_interval){
-        long long thiskey = stoll(string_keys[i].first);
-        if(i>0 && last_key >= thiskey){
-          values[interal_count].first = last_key+1;
-          values[interal_count].second = static_cast<int>(i);
-        }
-        else{
-          values[interal_count].first = thiskey;
-          values[interal_count].second = static_cast<int>(i);
-        }
-        last_key = values[interal_count].first;
-        interal_count++;
-        // std::cout<<interal_count<<std::endl;
-    }
-
     
-    // std::cout<<"Filename:"<<filename<<" count:"<<interval_count<<std::endl;
-    alex::Alex<long long, int> index((int)0, true, index_name_p, data_name_p);
-    // std::cout<<"Alex declared"<<std::endl;
-    index.bulk_load(values, interval_count);
-    index.sync_metanode(true);
-    index.sync_metanode(false);
-    alex_index = index;
   }
   else if(adgMod::modelmode == 9)
   {
@@ -772,10 +711,7 @@ void LearnedIndexData::ReadModel(const string& filename) {
     ft.load_metanode();
   }
   else if(adgMod::modelmode == 3){
-    std::ifstream input_file(filename);
-    if (!input_file.good()) return;
-    pgm::MappedPGMIndex<long long, PGM_Error,PGM_internal_Error> pgm_(filename);
-    pgm = pgm_;
+    
   }
   else if(adgMod::modelmode == 4){
     std::ifstream input_file(filename);
@@ -1047,7 +983,7 @@ long long int FileLearnedIndexData::Getmodelsize() {
         
         if (pointer != nullptr) {
           if(!pointer->Learned()) continue;
-          size_byte += pointer->pgm.file_size_in_bytes();
+          size_byte += pointer->pgm.get_index_size();
         }
     }
     return size_byte;
@@ -1149,7 +1085,7 @@ void FileLearnedIndexData::Report() {
           std::cout<<"FileModel: "<<i<<" ft size:"<<pointer->ft.get_index_size()<<std::endl;
         }
         else if(adgMod::modelmode==3){
-          std::cout<<"FileModel: "<<i<<" PGM size:"<<pointer->pgm.file_size_in_bytes()<<std::endl;
+          // std::cout<<"FileModel: "<<i<<" PGM size:"<<pointer->pgm.file_size_in_bytes()<<std::endl;
         }
         else if(adgMod::modelmode==4){
           std::cout<<"FileModel: "<<i<<" RMI size:"<<pointer->rmi.size_in_bytes()<<std::endl;
@@ -1251,6 +1187,63 @@ bool AccumulatedNumEntriesArray::SearchNoError(uint64_t position, size_t* index,
 
 uint64_t AccumulatedNumEntriesArray::NumEntries() const {
   return array.empty() ? 0 : array.back().first;
+}
+
+void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys) {
+  if (adgMod::modelmode == 3) {
+    // pgm
+    pgm::PGMIndex<uint64_t, PGM_Error, 4> index(keys.begin(), keys.end());
+    pgm = index;
+  }
+}
+
+void LearnedIndexData::WriteLearnedModelNew(const std::string& filename) {
+  if (adgMod::modelmode == 3) {
+    // pgm
+    std::string index_name = filename;
+    std::ofstream output_file(index_name);
+    // save members
+    // 1. n
+    output_file << pgm.n << std::endl;
+    // 2. first key
+    output_file << pgm.first_key << std::endl;
+    // 3. segment size
+    output_file << pgm.segments.size() << std::endl;
+    // 4. levels offset size
+    output_file << pgm.levels_offsets.size() << std::endl;
+    // 5. save container
+    for (auto& segment : pgm.segments) {
+      output_file << segment.key << " " << segment.slope << " " << segment.intercept << std::endl;
+    }
+    // 6. save levels offset
+    for (auto& offset : pgm.levels_offsets) {
+      output_file << offset << std::endl;
+    }
+  }
+}
+
+void LearnedIndexData::LoadLearnedModelNew(const std::string& filename) {
+  if (adgMod::modelmode == 3) {
+    // pgm
+    std::string index_name = filename;
+    std::ifstream input_file(index_name);
+    // load members
+    int seg_size = 0, lvl_size = 0;
+    input_file >> pgm.n >> pgm.first_key >> seg_size >> lvl_size;
+    for (int i = 0; i < seg_size; ++i) {
+      uint64_t key;
+      float slope;
+      int32_t intercept;
+      input_file >> key >> slope >> intercept;
+      pgm.segments.push_back({key, slope, intercept});
+    }
+    for (int i = 0; i < lvl_size; ++i) {
+      uint64_t offset;
+      input_file >> offset;
+      pgm.levels_offsets.push_back(offset);
+    }
+  }
+  learned.store(true);
 }
 
 }  // namespace adgMod

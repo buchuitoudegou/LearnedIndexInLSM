@@ -28,8 +28,8 @@
 #include <cstring>
 #include <iostream>
 
-#define PGM_Error 1024
-#define PGM_internal_Error 100
+#define PGM_Error 32
+#define PGM_internal_Error 4
 
 namespace pgm {
 
@@ -69,7 +69,7 @@ struct ApproxPos {
  */
 template<typename K, size_t Epsilon = 64, size_t EpsilonRecursive = 4, typename Floating = float>
 class PGMIndex {
-protected:
+public:
     template<typename, size_t, size_t, uint8_t, typename>
     friend class BucketingPGMIndex;
 
@@ -183,6 +183,13 @@ protected:
     void item_block_offset(size_t it, int *block_to_fetch, int *item_offset) {
         *block_to_fetch = int(it / SegmentCountPerBlock) + 1;
         *item_offset = it % SegmentCountPerBlock;
+    }
+
+    uint64_t get_index_size() {
+        uint64_t size = sizeof(K) + sizeof(n);
+        size += sizeof(size_t) * levels_offsets.size();
+        size += sizeof(Segment) * segments.size();
+        return size;
     }
 
     size_t predict_pos(size_t it, FILE* file_handler, int *last_block, char *block_data, K key) {
