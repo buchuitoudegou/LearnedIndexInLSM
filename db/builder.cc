@@ -15,7 +15,7 @@
 namespace leveldb {
 
 Status BuildTable(const std::string& dbname, Env* env, const Options& options,
-                  TableCache* table_cache, Iterator* iter, FileMetaData* meta) {
+                  TableCache* table_cache, Iterator* iter, FileMetaData* meta, std::vector<uint64_t>* keys) {
   Status s;
   meta->file_size = 0;
   iter->SeekToFirst();
@@ -34,6 +34,9 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
       Slice key = iter->key();
       meta->largest.DecodeFrom(key);
       builder->Add(key, iter->value());
+      if (keys != nullptr) {
+        keys->push_back(std::stoll(ExtractUserKey(key).ToString()));
+      }
     }
 
     // Finish and check for builder errors

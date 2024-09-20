@@ -477,8 +477,7 @@ uint64_t LearnedIndexData::FileLearn(void* arg) {
   Version* c = db->versions_->current();
   c->Ref();
   if (self->FillData(c, mas->meta)) {
-    // std::cout<<"Data Filled"<<std::endl;
-    self->Learn(fimename);
+    self->LearnFileNew(self->keys);
     entered = true;
   } else {
     // std::cout<<"Data NOT Filled"<<std::endl;
@@ -1195,13 +1194,14 @@ void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys) {
     pgm::PGMIndex<uint64_t, PGM_Error, 4> index(keys.begin(), keys.end());
     pgm = index;
   }
+  learned.store(true);
 }
 
 void LearnedIndexData::WriteLearnedModelNew(const std::string& filename) {
   if (adgMod::modelmode == 3) {
     // pgm
     std::string index_name = filename;
-    std::ofstream output_file(index_name);
+    std::ofstream output_file(index_name, std::ios::binary);
     // save members
     // 1. n
     output_file << pgm.n << std::endl;
@@ -1226,7 +1226,7 @@ void LearnedIndexData::LoadLearnedModelNew(const std::string& filename) {
   if (adgMod::modelmode == 3) {
     // pgm
     std::string index_name = filename;
-    std::ifstream input_file(index_name);
+    std::ifstream input_file(index_name, std::ios::binary);
     // load members
     int seg_size = 0, lvl_size = 0;
     input_file >> pgm.n >> pgm.first_key >> seg_size >> lvl_size;

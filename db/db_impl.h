@@ -143,7 +143,7 @@ private:
                         VersionEdit* edit, SequenceNumber* max_sequence)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base)
+  Status WriteLevel0Table(MemTable* mem, VersionEdit* edit, Version* base, std::vector<uint64_t>* keys = nullptr)
       EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   Status MakeRoomForWrite(bool force /* compact even if there is room? */)
