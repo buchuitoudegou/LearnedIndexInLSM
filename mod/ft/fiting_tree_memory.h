@@ -167,6 +167,8 @@ class FITingTree {
     public:
         double predict_time = 0;
         double search_time = 0;
+        double leaf_node_search_range = 0;
+        double leaf_node_search_depth = 0;
         #if Disk
         StorageManager *sm;
         MetaNode metanode;
@@ -674,7 +676,10 @@ class FITingTree {
 
     void read_block_or_not(int32_t *last_block, int32_t block_to_fetch, char *block_data, int *block_count) {
         if (block_to_fetch != *last_block) {
+            auto start_time = std::chrono::high_resolution_clock::now();
             sm->get_block(block_to_fetch, block_data);
+            auto end_time = std::chrono::high_resolution_clock::now();
+            leaf_node_search_depth += std::chrono::duration<double, std::nano>(end_time - start_time).count();
             *last_block = block_to_fetch;
             *block_count += 1;
         }
@@ -688,6 +693,7 @@ class FITingTree {
 //        bool found = false;
         int last_block = -1;
         char *_data2 = new char[MaxNodeSize];
+        auto start_time = std::chrono::high_resolution_clock::now();
         while (start <= end) {
             int mid = start + (end - start) / 2;
             int _block = mid / ItermCountOneBlock;
@@ -702,13 +708,15 @@ class FITingTree {
             else end = mid - 1;
         }
         // start search from mid
+        auto end_time = std::chrono::high_resolution_clock::now();
+        search_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
 
 
     }
     bool search_in_leaf_node(ftKeyType key, int start_block, int pos, ftValueType *v, int *block_count, int item_count, int item_buffer) {
         int start = std::max<int>(pos - error_bound, 0) + 2;
         int end = std::min<int>(pos + error_bound + 2, item_count) + 2;
-
+        leaf_node_search_range += end - start;
         bool found = false;
         int last_block = -1;
         char *_data2 = new char[MaxNodeSize];
@@ -727,8 +735,7 @@ class FITingTree {
             } else if (_temp[_offset].key < key) start = mid + 1;
             else end = mid - 1;
         }
-        auto end_time = std::chrono::high_resolution_clock::now();
-        search_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
+
 
         if (!found && item_buffer > 0) {
             int _block = (item_count+2) / ItermCountOneBlock;
@@ -745,6 +752,8 @@ class FITingTree {
                 }
             }
         }
+        auto end_time = std::chrono::high_resolution_clock::now();
+        search_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
         delete[] _data2;
         return found;
     }
@@ -1421,7 +1430,7 @@ class FITingTree {
         // we will not go into the `while loop' start = 1, end = 0
         int mid = iterm_count + (is_left_most ? 1 : 2);
         int _offset;
-
+        auto start_time = std::chrono::high_resolution_clock::now();
         while (start <= end) {
             mid = start + (end - start) / 2;
             int _block = mid / ItermCountOneBlock;
@@ -1473,6 +1482,8 @@ class FITingTree {
 
             }
         }
+        auto end_time = std::chrono::high_resolution_clock::now();
+        search_time += std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - start_time).count();
         delete[] _data2;
         return;
     }
