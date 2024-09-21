@@ -12,8 +12,8 @@
 #include <atomic>
 #include <mod/lipp/core/storage_management.h>
 #include "mod/ft/fiting_tree_memory.h"
-#include "mod/pgm/include/pgm/pgm_index_variants.hpp"
-#include "mod/pgm/include/pgm/pgm_index.hpp"
+// #include "mod/pgm/include/pgm/pgm_index_variants.hpp"
+#include "mod/pgm/pgm_index.hpp"
 #include "mod/rmi/include/rmi/models.hpp"
 #include "mod/rmi/include/rmi/rmi.hpp"
 #include "mod/radixspline/include/rs/multi_map.h"
@@ -105,13 +105,13 @@ namespace adgMod {
         StorageManager<lippKeyType, lippValueType> lipp_index;
         //fitting tree
         ft::FITingTree ft;
-        pgm::PGMIndex<uint64_t, PGM_Error, 4> pgm;
+        pgm::PGMIndex<uint64_t> pgm;
         rmi::RmiLAbs<long long int, rmi::LinearSpline, rmi::LinearRegression> rmi;
         rs::RadixSpline<long long int> rs;
         ts::TrieSpline<long long int> ts;
         DILI dili;
         alex::Alex<long long int, int> alex_index;
-        FitingTree<long long> ft_index;
+        FitingTree<uint64_t> ft_index;
     public:
         // all keys in the file/level to be leraned from 
         // <key, tag> 0: normal key 1: first key of a datablock 2: last key of a block

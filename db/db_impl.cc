@@ -632,7 +632,7 @@ int DBImpl::CompactMemTable() {
   adgMod::levelled_counters[5].Increment(edit.new_files_[0].first, time.second - time.first);
   adgMod::compaction_counter_mutex.Unlock();
 
-  if (adgMod::MOD == 6) {
+  if (adgMod::MOD >= 6) {
     for (auto& new_file : edit.new_files_) {
       adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(new_file.second.number);
       model->LearnFileNew(keys);
@@ -1041,7 +1041,7 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
   // When a new file is generated, it's put into learning_prepare queue.
   // env_->PrepareLearning((__rdtscp(&dummy) - instance->initial_time) / adgMod::reference_frequency, level, meta);
 
-  if (adgMod::MOD == 6) {
+  if (adgMod::MOD >= 6) {
     assert(keys != nullptr);
     adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(meta->number);
     model->LearnFileNew(*keys);

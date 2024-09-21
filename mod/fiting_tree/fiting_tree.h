@@ -8,7 +8,8 @@
 #include "segment.h"
 #include "piecewise_linear_model.h"
 #include "stx/btree.h"
-
+#include <string>
+#include <fstream>
 #define ADD_ERR(x, error, size) ((x) + (error) >= (size) ? (size) : (x) + (error))
 #define SUB_ERR(x, error) ((x) <= (error) ? 0 : ((x) - (error)))
 
@@ -33,8 +34,6 @@ template <typename KeyType, typename Floating = long double>
 class FitingTree
 {
     // static_assert(Error > 0);
-public:
-    uint64_t Error = 64;
 private:
     /**
      * A struct that stores the result of a query to a @ref FITing-Tree, that is, a range [@ref lo, @ref hi)
@@ -46,7 +45,7 @@ private:
         uint64_t hi;  // The lower bound of the range where the key can be found
         uint64_t lo;  // The upper bound of the range where the key can be found
     };
-
+    uint64_t Error = 64;
     size_t n;                                         // Total number of keys
     KeyType first_key;                                // The smallest key
     std::vector<Ft_Segment<KeyType, uint64_t>> segments; // The segments composing the index
@@ -142,6 +141,63 @@ public:
     size_t get_segments_count() const
     {
         return segments.size();
+    }
+    
+    void write_model(std::string filename){
+        std::ofstream file;
+        file.open(filename, std::ios::binary);
+        file.write(reinterpret_cast<char*>(&Error), sizeof(Error));
+        file.write(reinterpret_cast<char*>(&n), sizeof(n));
+        file.write(reinterpret_cast<char*>(&first_key), sizeof(first_key));
+        // size of segments
+        size_t size = segments.size();
+        file.write(reinterpret_cast<char*>(&size), sizeof(size));
+        // vector of segments
+        auto segment = Ft_Segment<KeyType, uint64_t>();
+        auto buffer_size = segment.get_size();
+        char buffer[buffer_size];
+        for(auto& segment : segments){
+            segment.serialize(buffer);
+            file.write(reinterpret_cast<char*>(buffer), buffer_size);
+        }
+        // btree
+        fiting_tree.dump(file);
+
+        file.close();
+    }
+    void read_model(std::string filename){
+        std::ifstream file;
+        file.open(filename, std::ios::binary);
+        file.read(reinterpret_cast<char*>(&Error), sizeof(Error));
+        file.read(reinterpret_cast<char*>(&n), sizeof(n));
+        file.read(reinterpret_cast<char*>(&first_key), sizeof(first_key));
+        // size of segments
+        size_t size;
+        file.read(reinterpret_cast<char*>(&size), sizeof(size));
+        // vector of segments
+        
+        segments.clear();
+        Ft_Segment<KeyType, uint64_t> segment;
+        auto buffer_size = segment.get_size();
+        char buffer[buffer_size];
+        for(size_t i = 0; i < size; i++){
+            file.read(buffer, buffer_size);
+            segments.push_back(Ft_Segment<KeyType, uint64_t>(buffer));
+        }
+        // btree
+        fiting_tree.restore(file);
+        
+        file.close();
+    }
+    void print()
+    {
+        std::cout<<"Error: "<<Error<<std::endl;
+        std::cout<<"n: "<<n<<std::endl;
+        std::cout<<"Segments count: "<< segments.size()<<std::endl;
+        for(int i=0; i<5; i++){
+            auto segment = segments[i];
+            std::cout<<segment.get_start_key()<<std::endl;
+        }
     }
 };
 

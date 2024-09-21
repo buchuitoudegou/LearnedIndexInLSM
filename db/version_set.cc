@@ -1537,7 +1537,7 @@ namespace leveldb {
                 (options_->compaction_policy == kCompactionStyleLazyLevel && logical_level != options_->max_logical_level - 1))) {
                 end_physical_level = start_physical_level + options_->max_bytes_for_level_multiplier;
             }
-            assert(level >= 0);
+            // assert(level >= 0);
             c = new Compaction(options_, logical_level);
             
             // Pick all the file at this level

@@ -336,8 +336,8 @@ int main(int argc, char *argv[]) {
     }
     else if(modelmode==3)
     {
-        cout<<"PGM Error: "<<PGM_Error<<" Internal error: "<<PGM_internal_Error<<endl;
-        model_error=PGM_Error;
+        // cout<<"PGM Error: "<<PGM_Error<<" Internal error: "<<PGM_internal_Error<<endl;
+        // model_error=PGM_Error;
     }
 
     vector<string> keys;
@@ -676,7 +676,7 @@ int main(int argc, char *argv[]) {
                 modelname=modelname+"-"+std::to_string(RSbits);
             }else if(modelmode==3)
             {
-                modelname=modelname+"-"+std::to_string(PGM_internal_Error);
+                // modelname=modelname+"-"+std::to_string(PGM_internal_Error);
                 auto all_indexs = adgMod::file_data->file_learned_index_data;
                 uint32_t total_segments = 0;
                 int file_cnt = 0;

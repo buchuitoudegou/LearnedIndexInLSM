@@ -612,8 +612,8 @@ int main(int argc, char *argv[]) {
             string modelname = ModelMap[adgMod::modelmode];
             if(modelmode==5)
                 modelname=modelname+"-"+std::to_string(RSbits);
-            else if(modelmode==3)
-                modelname=modelname+"-"+std::to_string(PGM_internal_Error);
+            // else if(modelmode==3)
+            //     modelname=modelname+"-"+std::to_string(PGM_internal_Error);
             else if(modelmode==1)
                 modelname=modelname+"-"+std::to_string(lipp_gap);
             else if(modelmode==8)

@@ -28,8 +28,8 @@
 #include <cstring>
 #include <iostream>
 
-#define PGM_Error 32
-#define PGM_internal_Error 4
+// #define PGM_Error 32
+// #define PGM_internal_Error 4
 
 namespace pgm {
 
@@ -67,7 +67,7 @@ struct ApproxPos {
  * @tparam EpsilonRecursive controls the size of the search range in the internal structure
  * @tparam Floating the floating-point type to use for slopes
  */
-template<typename K, size_t Epsilon = 64, size_t EpsilonRecursive = 4, typename Floating = float>
+template<typename K, typename Floating = float>
 class PGMIndex {
 public:
     template<typename, size_t, size_t, uint8_t, typename>
@@ -76,7 +76,7 @@ public:
     template<typename, size_t, typename>
     friend class EliasFanoPGMIndex;
 
-    static_assert(Epsilon > 0);
+    // static_assert(Epsilon > 0);
     struct Segment;
 
     size_t n;                           ///< The number of elements this index was built on.
@@ -142,7 +142,7 @@ public:
      * @return an iterator to the segment responsible for the given key
      */
     auto segment_for_key(const K &key) const {
-        if constexpr (EpsilonRecursive == 0) {
+        if (EpsilonRecursive == 0) {
             return std::prev(std::upper_bound(segments.begin(), segments.begin() + segments_count(), key));
         }
 
@@ -153,7 +153,7 @@ public:
             auto lo = level_begin + PGM_SUB_EPS(pos, EpsilonRecursive + 1);
 
             static constexpr size_t linear_search_threshold = 8 * 64 / sizeof(Segment);
-            if constexpr (EpsilonRecursive <= linear_search_threshold) {
+            if (EpsilonRecursive <= linear_search_threshold) {
                 for (; std::next(lo)->key <= key; ++lo)
                     continue;
                 it = lo;
@@ -236,7 +236,7 @@ public:
             size_t lo = level_begin + PGM_SUB_EPS(pos, EpsilonRecursive + 1);
 
             static constexpr size_t linear_search_threshold = 8 * 64 / sizeof(Segment);
-            if constexpr (EpsilonRecursive <= linear_search_threshold) {
+            if (EpsilonRecursive <= linear_search_threshold) {
                 for (;;++lo) {
                     auto lo_next_key = obtain_key_from_disk(lo + 1, file_handler, &last_block, block_data);
                     if (lo_next_key> key) break;
@@ -266,7 +266,8 @@ public:
 
 public:
 
-    static constexpr size_t epsilon_value = Epsilon;
+    size_t Epsilon;
+    size_t EpsilonRecursive;
 
     /**
      * Constructs an empty index.
@@ -277,15 +278,14 @@ public:
      * Constructs the index on the given sorted vector.
      * @param data the vector of keys to be indexed, must be sorted
      */
-    explicit PGMIndex(const std::vector<K> &data) : PGMIndex(data.begin(), data.end()) {}
+    explicit PGMIndex(const std::vector<K> &data, size_t Epsilon = 64, size_t EpsilonRecursive = 4) : PGMIndex(data.begin(), data.end(), Epsilon, EpsilonRecursive) {}
 
     /**
      * Constructs the index on the sorted keys in the range [first, last).
      * @param first, last the range containing the sorted keys to be indexed
      */
-    //here
     template<typename RandomIt>
-    PGMIndex(RandomIt first, RandomIt last)
+    PGMIndex(RandomIt first, RandomIt last, size_t Epsilon = 64, size_t EpsilonRecursive = 4)
         : n(std::distance(first, last)),
           first_key(n ? *first : K(0)),
           segments(),
@@ -418,12 +418,16 @@ public:
      * @return the size of the index in bytes
      */
     size_t size_in_bytes() const { return segments.size() * sizeof(Segment) + levels_offsets.size() * sizeof(size_t); }
+
+    std::pair<uint64_t, uint64_t> get_epsilon() {
+        return std::make_pair(Epsilon, EpsilonRecursive);
+    }
 };
 
 #pragma pack(push, 1)
 
-template<typename K, size_t Epsilon, size_t EpsilonRecursive, typename Floating>
-struct PGMIndex<K, Epsilon, EpsilonRecursive, Floating>::Segment {
+template<typename K, typename Floating>
+struct PGMIndex<K, Floating>::Segment {
     K key;             ///< The first key that the segment indexes.
     Floating slope;    ///< The slope of the segment.
     int32_t intercept; ///< The intercept of the segment.
