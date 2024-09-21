@@ -229,7 +229,7 @@ bool LearnedIndexData::Learn(string filename) {
     std::size_t layer2_size = adgMod::rmi_layer_size;
     int count = string_keys.size();
     real_num_entries = count;
-    std::vector<long long int> keys;
+    std::vector<uint64_t> keys;
     // for(int i=0; i<count; i++){
     //   keys.push_back(stoll(string_keys[i].first));
     // }
@@ -246,7 +246,7 @@ bool LearnedIndexData::Learn(string filename) {
         }
         last_key = keys[i];
     }
-    rmi::RmiLAbs<long long, rmi::LinearSpline, rmi::LinearRegression> rmi_(keys, layer2_size);
+    rmi::RmiLAbs<uint64_t, rmi::LinearSpline, rmi::LinearRegression> rmi_(keys, layer2_size);
     // std::cout<<"Trained obj generated!"<<std::endl;
     rmi = rmi_;
     // std::cout<<"Object assigned!"<<std::endl;
@@ -278,9 +278,9 @@ bool LearnedIndexData::Learn(string filename) {
 
     long long int min = keys.front();
     long long int max = keys.back();
-    rs::Builder<long long int> rsb(min, max, adgMod::RSbits, error);
+    rs::Builder<uint64_t> rsb(min, max, adgMod::RSbits, error);
     for (const auto& key : keys) rsb.AddKey(key);
-    rs::RadixSpline<long long int> rs_;
+    rs::RadixSpline<uint64_t> rs_;
     rs_ = rsb.Finalize();
     rs = rs_;
   }
@@ -557,7 +557,7 @@ void LearnedIndexData::WriteModel(const string& filename) {
     }
   }
   else if(adgMod::modelmode == 5){
-    rs::Serializer<long long int> serializer;
+    rs::Serializer<uint64_t> serializer;
     std::string bytes;
     serializer.ToBytes(rs, &bytes);
     string filename_ = filename;
@@ -688,7 +688,7 @@ void LearnedIndexData::ReadModel(const string& filename) {
   else if(adgMod::modelmode == 4){
     std::ifstream input_file(filename);
     if (!input_file.good()) return;
-    rmi::RmiLAbs<long long, rmi::LinearSpline, rmi::LinearRegression> rmi_;
+    rmi::RmiLAbs<uint64_t, rmi::LinearSpline, rmi::LinearRegression> rmi_;
     // std::cout<<"Begin reading...:"<<std::endl;
     rmi_.read_file_e(filename);
     rmi = rmi_;
@@ -717,7 +717,7 @@ void LearnedIndexData::ReadModel(const string& filename) {
     std::string fileContent(buffer.begin(), buffer.end());
 
     // 反序列化
-    rs::Serializer<long long int> serializer;
+    rs::Serializer<uint64_t> serializer;
     const auto rs_deserialized = serializer.FromBytes(fileContent);
     rs = rs_deserialized;
 
@@ -936,8 +936,7 @@ long long int FileLearnedIndexData::Getmodelsize() {
         
         if (pointer != nullptr) {
           if(!pointer->Learned()) continue;
-          size_byte += pointer->ft.get_index_size();
-          // std::cout<<"size_byte:"<<size_byte<<std::endl;
+          size_byte += pointer->ft_index.get_index_size();
         }
     }
     return size_byte;
@@ -1186,17 +1185,30 @@ void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys) {
     segments.push_back((Segment){temp, 0, 0});
     string_segments = std::move(segments);
   }
-  if (adgMod::modelmode == 2)
+  else if (adgMod::modelmode == 2)
   {
     FitingTree<uint64_t> ft(keys, error);
     ft_index = ft;
   }
-  if (adgMod::modelmode == 3) {
+  else if (adgMod::modelmode == 3) {
     // pgm
     pgm::PGMIndex<uint64_t> index(keys.begin(), keys.end(),error,4);
     pgm = index;
   }
-  if (adgMod::modelmode == 6) {
+  else if (adgMod::modelmode == 4)
+  {
+    rmi::RmiLAbs<uint64_t, rmi::LinearSpline, rmi::LinearRegression> rmi_(keys, adgMod::rmi_layer_size);
+    rmi = rmi_;
+  }
+  else if (adgMod::modelmode == 5)
+  {
+    uint64_t min = keys.front();
+    uint64_t max = keys.back();
+    rs::Builder<uint64_t> rsb(min, max, adgMod::RSbits, error);
+    for (const auto& key : keys) rsb.AddKey(key);
+    rs = rsb.Finalize();
+  }
+  else if (adgMod::modelmode == 6) {
     ts::Builder<long long int> rsb(keys.front(), keys.back(), error);
     for (const auto& key : keys) rsb.AddKey(key);
     ts = rsb.Finalize();
@@ -1223,8 +1235,9 @@ void LearnedIndexData::WriteLearnedModelNew(const std::string& filename) {
   }
   if (adgMod::modelmode == 2)
   {
-    std::ofstream output_file(filename,std::ios_base::binary);
-    // todo
+    std::ofstream output_file(filename);
+    ft_index.dump_model(output_file);
+    output_file.close();
   }
   if (adgMod::modelmode == 3) {
     // pgm
@@ -1248,7 +1261,22 @@ void LearnedIndexData::WriteLearnedModelNew(const std::string& filename) {
       output_file << offset << std::endl;
     }
   }
-  if (adgMod::modelmode == 6) {
+  else if (adgMod::modelmode == 4)
+  {
+    std::ofstream output_file(filename);
+    rmi.dump(output_file);
+    output_file.close();
+  }
+  else if (adgMod::modelmode == 5)
+  {
+    rs::Serializer<uint64_t> serializer;
+    std::string bytes;
+    serializer.ToBytes(rs, &bytes);
+    std::ofstream outFile(filename);
+    outFile << bytes;
+    outFile.close();
+  }
+  else if (adgMod::modelmode == 6) {
     ts::Serializer<long long int> serializer;
     std::string bytes;
     serializer.ToBytes(ts, &bytes);
@@ -1262,6 +1290,7 @@ void LearnedIndexData::LoadLearnedModelNew(const std::string& filename) {
   if (adgMod::modelmode == 0) {
     // PLR
     std::ifstream input_file(filename, std::ios::binary);
+    if (!input_file.good()) return;
     // load members
     input_file >> min_key;
     input_file >> max_key;
@@ -1274,11 +1303,19 @@ void LearnedIndexData::LoadLearnedModelNew(const std::string& filename) {
       input_file >> x >> k >> b;
       string_segments.emplace_back(x, k, b);
     }
+    input_file.close();
   }
-  if (adgMod::modelmode == 3) {
+  else if (adgMod::modelmode == 2)
+  {
+    std::ifstream input_file(filename, std::ios::binary);
+    if (!input_file.good()) return;
+    ft_index.load_model(input_file);
+    input_file.close();
+  }
+  else if (adgMod::modelmode == 3) {
     // pgm
-    std::string index_name = filename;
-    std::ifstream input_file(index_name, std::ios::binary);
+    std::ifstream input_file(filename, std::ios::binary);
+    if (!input_file.good()) return;
     // load members
     int seg_size = 0, lvl_size = 0;
     input_file >> pgm.n >> pgm.first_key >> seg_size >> lvl_size;
@@ -1295,8 +1332,44 @@ void LearnedIndexData::LoadLearnedModelNew(const std::string& filename) {
       pgm.levels_offsets.push_back(offset);
     }
   }
-  if (adgMod::modelmode == 6) {
-     std::ifstream input_file(filename, std::ios::binary | std::ios::ate);
+  else if (adgMod::modelmode == 4)
+  {
+    std::ifstream input_file(filename, std::ios::binary);
+    rmi::RmiLAbs<uint64_t, rmi::LinearSpline, rmi::LinearRegression> rmi_;
+    rmi_.load(input_file);
+    rmi = rmi_;
+    input_file.close();
+  }
+  else if (adgMod::modelmode == 5)
+  {
+    std::ifstream input_file(filename, std::ios::binary | std::ios::ate);
+    if (!input_file.good()) return;
+
+    // 获取文件大小
+    std::streamsize fileSize = input_file.tellg();
+    input_file.seekg(0, std::ios::beg);
+
+    // 创建一个缓冲区来存储整个文件内容
+    std::vector<char> buffer(fileSize);
+
+    // 读取整个文件到缓冲区
+    if (!input_file.read(buffer.data(), fileSize)) {
+        std::cerr << "Error reading file!" << std::endl;
+        return;
+    }
+
+    input_file.close();
+
+    // 将缓冲区内容转换为字符串
+    std::string fileContent(buffer.begin(), buffer.end());
+
+    // 反序列化
+    rs::Serializer<uint64_t> serializer;
+    const auto rs_deserialized = serializer.FromBytes(fileContent);
+    rs = rs_deserialized;
+  }
+  else if (adgMod::modelmode == 6) {
+    std::ifstream input_file(filename, std::ios::binary | std::ios::ate);
     if (!input_file.good()) return;
 
     // 获取文件大小

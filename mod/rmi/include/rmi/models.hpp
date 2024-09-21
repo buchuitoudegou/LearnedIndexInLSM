@@ -118,8 +118,18 @@ class LinearSpline
         file << std::setprecision(writeprecision) << slope_ << " " << intercept_ << std::endl; // Write the LinearSpline object to the file
         return;
     }
+    void dump(std::ostream &file)
+    {
+        file.write(reinterpret_cast<char*>(&slope_), sizeof(slope_));
+        file.write(reinterpret_cast<char*>(&intercept_), sizeof(intercept_));
+    }
     void read_file_m(std::ifstream &file){
         file >> slope_ >> intercept_; // Read the slope and intercept from the file
+        return;
+    }
+    void load(std::istream &file){
+        file.read(reinterpret_cast<char*>(&slope_), sizeof(slope_));
+        file.read(reinterpret_cast<char*>(&intercept_), sizeof(intercept_));
         return;
     }
 };
@@ -232,32 +242,22 @@ class LinearRegression
         return out << m.slope() << " * x + " << m.intercept();
     }
 
-    // void write_file_m(std::string filename){
-    //     std::ofstream file(filename, std::ios::app); // Open the file in append mode
-    //     if (!file) {
-    //         std::cerr << "Unable to open file " << filename << " in Linear Regression";
-    //         return;
-    //     }
-    //     file << std::setprecision(writeprecision) << slope_ << " " << intercept_ << std::endl; // Write the LinearSpline object to the file
-    //     file.close();
-    //     return;
-    // }
     void write_file_m(std::ofstream &file){
         file << std::setprecision(writeprecision) << slope_ << " " << intercept_ << std::endl; // Write the LinearSpline object to the file
         return;
     }
+    void dump(std::ostream &file)
+    {
+        file.write(reinterpret_cast<char*>(&slope_), sizeof(slope_));
+        file.write(reinterpret_cast<char*>(&intercept_), sizeof(intercept_));
+    }
 
-    // void read_file_m(std::string filename){
-    //     std::ifstream file(filename); // Open the file in read mode
-    //     if (!file) {
-    //         std::cerr << "Unable to open file " << filename << " in Linear Regression";
-    //         return;
-    //     }
-    //     file >> slope_ >> intercept_; // Read the slope and intercept from the file
-    //     file.close();
-    // }
     void read_file_m(std::ifstream &file){
         file >> slope_ >> intercept_; // Read the slope and intercept from the file
+    }
+    void load(std::istream &file){
+        file.read(reinterpret_cast<char*>(&slope_), sizeof(slope_));
+        file.read(reinterpret_cast<char*>(&intercept_), sizeof(intercept_));
     }
 };
 

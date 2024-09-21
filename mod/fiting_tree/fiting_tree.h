@@ -143,9 +143,7 @@ public:
         return segments.size();
     }
     
-    void write_model(std::string filename){
-        std::ofstream file;
-        file.open(filename, std::ios::binary);
+    void dump_model(std::ostream &file){
         file.write(reinterpret_cast<char*>(&Error), sizeof(Error));
         file.write(reinterpret_cast<char*>(&n), sizeof(n));
         file.write(reinterpret_cast<char*>(&first_key), sizeof(first_key));
@@ -162,12 +160,8 @@ public:
         }
         // btree
         fiting_tree.dump(file);
-
-        file.close();
     }
-    void read_model(std::string filename){
-        std::ifstream file;
-        file.open(filename, std::ios::binary);
+    void load_model(std::istream &file){
         file.read(reinterpret_cast<char*>(&Error), sizeof(Error));
         file.read(reinterpret_cast<char*>(&n), sizeof(n));
         file.read(reinterpret_cast<char*>(&first_key), sizeof(first_key));
@@ -186,8 +180,6 @@ public:
         }
         // btree
         fiting_tree.restore(file);
-        
-        file.close();
     }
     void print()
     {
@@ -198,6 +190,16 @@ public:
             auto segment = segments[i];
             std::cout<<segment.get_start_key()<<std::endl;
         }
+    }
+    size_t get_index_size()
+    {
+        size_t ret=0;
+        ret+=sizeof(Error);
+        ret+=sizeof(n);
+        ret+=sizeof(first_key);
+        ret+=segments.size()*segments[0].get_size();
+        ret+=fiting_tree.get_tree_size();
+        return ret;
     }
 };
 

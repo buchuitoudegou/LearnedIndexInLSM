@@ -106,8 +106,8 @@ namespace adgMod {
         //fitting tree
         ft::FITingTree ft;
         pgm::PGMIndex<uint64_t> pgm;
-        rmi::RmiLAbs<long long int, rmi::LinearSpline, rmi::LinearRegression> rmi;
-        rs::RadixSpline<long long int> rs;
+        rmi::RmiLAbs<uint64_t, rmi::LinearSpline, rmi::LinearRegression> rmi;
+        rs::RadixSpline<uint64_t> rs;
         ts::TrieSpline<long long int> ts;
         DILI dili;
         alex::Alex<long long int, int> alex_index;

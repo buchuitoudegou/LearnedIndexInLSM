@@ -182,11 +182,31 @@ class Rmi
         // std::cout<<"\tWriting l1 model to file:"<<std::endl;
         l1_.write_file_m(file);
         // std::cout<<"\tWriting "<< layer2_size_ << " models in layer2 to file"<<std::endl;
-        for(int i=0; i<layer2_size_; i++){
+        for(size_t i=0; i<layer2_size_; i++){
             l2_[i].write_file_m(file);
         }
         file.close();
         return;
+    }
+
+    void dump(std::ostream &file)
+    {
+        file.write(reinterpret_cast<char*>(&n_keys_), sizeof(n_keys_));
+        file.write(reinterpret_cast<char*>(&layer2_size_), sizeof(layer2_size_));
+        l1_.dump(file);
+        for(int i=0; i<layer2_size_; i++){
+            l2_[i].dump(file);
+        }
+    }
+    void load(std::istream &file)
+    {
+        file.read(reinterpret_cast<char*>(&n_keys_), sizeof(n_keys_));
+        file.read(reinterpret_cast<char*>(&layer2_size_), sizeof(layer2_size_));
+        l1_.load(file);
+        l2_ = new layer2_type[layer2_size_];
+        for(int i=0; i<layer2_size_; i++){
+            l2_[i].load(file);
+        }
     }
 
     int read_file(std::string filename){
@@ -442,104 +462,76 @@ class RmiLAbs : public Rmi<Key, Layer1, Layer2>
 
         // 调用基类的写文件方法
         base_type::write_file(filename);
+    }
 
+    void dump(std::ostream &file)
+    {
+        auto error_size = errors_.size();
+        file.write(reinterpret_cast<char*>(&error_size), sizeof(error_size));
+        for (size_t error : errors_) {
+            file.write(reinterpret_cast<char*>(&error), sizeof(error));
+        }
+        base_type::dump(file);
+    }
 
-        // std::ofstream file(filename, std::ios::app);
-        // // std::cout<<"error size is:"<< errors_.size()<<std::endl;
-        // // std::cout<<"Writing errors to file:"<<std::endl;
-        // file << std::setprecision(writeprecision) << errors_.size() << std::endl;
-        // for(int i=0; i<errors_.size(); i++){
-        //     file << errors_[i] << " ";
-        // }
-        // file << std::endl;
-        // file.close();
-        // // std::cout<<"Call base type write func:"<<std::endl;
-        // base_type::write_file(filename);
-        // return;
+    void load(std::istream &file){
+        auto error_size = errors_.size();
+        file.read(reinterpret_cast<char*>(&error_size), sizeof(error_size));
+        for (size_t i = 0; i < error_size; ++i) {
+            size_t error;
+            file.read(reinterpret_cast<char*>(&error), sizeof(error));
+            errors_.push_back(error);
+        }
+        base_type::load(file);
     }
 
     void read_file_e(std::string filename){
+        // 打using base_type = Rmi<Key, Layer1, Layer2>; // 定义 base_type 别名以简化代码
+        // using layer2_type = typename base_type::layer2_type; // 定义 layer2_type 别名以简化代码
 
-    // 打using base_type = Rmi<Key, Layer1, Layer2>; // 定义 base_type 别名以简化代码
-    // using layer2_type = typename base_type::layer2_type; // 定义 layer2_type 别名以简化代码
+        // 打开文件，并将光标移到文件末尾以获取文件大小
+        std::ifstream file(filename, std::ios::binary | std::ios::ate);
+        if (!file) {
+            std::cerr << "Unable to open file " << filename << std::endl;
+            return;
+        }
 
-    // 打开文件，并将光标移到文件末尾以获取文件大小
-    std::ifstream file(filename, std::ios::binary | std::ios::ate);
-    if (!file) {
-        std::cerr << "Unable to open file " << filename << std::endl;
-        return;
-    }
+        // 获取文件大小
+        std::streamsize file_size = file.tellg();
+        file.seekg(0, std::ios::beg);
 
-    // 获取文件大小
-    std::streamsize file_size = file.tellg();
-    file.seekg(0, std::ios::beg);
+        // 分配缓冲区并一次性读取整个文件
+        std::vector<char> buffer(file_size);
+        if (!file.read(buffer.data(), file_size)) {
+            std::cerr << "Error reading file " << filename << std::endl;
+            return;
+        }
 
-    // 分配缓冲区并一次性读取整个文件
-    std::vector<char> buffer(file_size);
-    if (!file.read(buffer.data(), file_size)) {
-        std::cerr << "Error reading file " << filename << std::endl;
-        return;
-    }
+        // 使用缓冲区解析数据
+        std::istringstream in(std::string(buffer.data(), buffer.size()));
 
-    // 使用缓冲区解析数据
-    std::istringstream in(std::string(buffer.data(), buffer.size()));
+        // 读取错误大小
+        int error_size;
+        in >> error_size;
 
-    // 读取错误大小
-    int error_size;
-    in >> error_size;
+        // 读取错误列表
+        double num;
+        for (int i = 0; i < error_size; ++i) {
+            in >> num;
+            errors_.push_back(num);
+        }
 
-    // 读取错误列表
-    double num;
-    for (int i = 0; i < error_size; ++i) {
-        in >> num;
-        errors_.push_back(num);
-    }
+        // 读取基类的键数量和层2的大小
+        in >> base_type::n_keys_ >> base_type::layer2_size_;
 
-    // 读取基类的键数量和层2的大小
-    in >> base_type::n_keys_ >> base_type::layer2_size_;
+        // 读取第1层模型的斜率和截距
+        in >> base_type::l1_.slope_ >> base_type::l1_.intercept_;
 
-    // 读取第1层模型的斜率和截距
-    in >> base_type::l1_.slope_ >> base_type::l1_.intercept_;
-
-    // 分配并读取第2层模型
-    base_type::l2_ = new layer2_type[base_type::layer2_size_];
-    for (int i = 0; i < base_type::layer2_size_; ++i) {
-        in >> base_type::l2_[i].slope_ >> base_type::l2_[i].intercept_;
-    }
-        // std::ifstream file(filename); 
-
-        // if (!file) {
-        //     std::cerr << "Unable to open file " << filename;
-        //     return;
-        // }
-
-        // int error_size;
-        
-        // file >> error_size;
-        // // std::cout<<"\tReading error size: "<<error_size<<""<<std::endl;
-
-        // double num;
-        // // std::cout<<"\tReading errorlist "<<std::endl;
-        // for(int i=0; i<error_size; i++){
-        //     file >> num;
-        //     // std::cout<<num<<" ";
-        //     errors_.push_back(num);
-        // }
-        // // std::cout<<std::endl;
-
-        // file >> base_type::n_keys_ >> base_type::layer2_size_;
-
-        // //read models
-        // // base_type::l1_.read_file_m(filename);
-        // // std::cout<<"\tReading l1 model"<<std::endl;
-        // file >> base_type::l1_.slope_ >> base_type::l1_.intercept_; 
-        // // std::cout<<"\tReading "<< base_type::layer2_size_ << " models in layer2"<<std::endl;
-        // base_type::l2_ = new layer2_type[base_type::layer2_size_];
-        // for(int i=0; i<base_type::layer2_size_; i++){
-        //     // base_type::l2_[i].read_file_m(filename);
-        //     file >> base_type::l2_[i].slope_ >> base_type::l2_[i].intercept_;
-        // }
-
+        // 分配并读取第2层模型
+        base_type::l2_ = new layer2_type[base_type::layer2_size_];
+        for (size_t i = 0; i < base_type::layer2_size_; ++i) {
+            in >> base_type::l2_[i].slope_ >> base_type::l2_[i].intercept_;
+        }
     }
 
     void printstats(){
