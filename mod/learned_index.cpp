@@ -892,7 +892,8 @@ long long int FileLearnedIndexData::Getmodelsize() {
     for (size_t i = 0; i < file_learned_index_data.size(); ++i) {
         auto pointer = file_learned_index_data[i];
         
-        if (pointer != nullptr && pointer->cost != 0) {
+        // if (pointer != nullptr && pointer->cost != 0) {
+        if (pointer != nullptr) {
             if(!pointer->Learned()) continue;
             // printf("FileModel %lu %d ", i, i > watermark);
             segsum += pointer->string_segments.size(); //in seg num
@@ -1242,24 +1243,24 @@ void LearnedIndexData::WriteLearnedModelNew(const std::string& filename) {
   if (adgMod::modelmode == 3) {
     // pgm
     std::ofstream output_file(filename, std::ios::binary);
-    output_file.precision(40);
-    // save members
-    // 1. n
-    output_file << pgm.n << std::endl;
-    // 2. first key
-    output_file << pgm.first_key << std::endl;
-    // 3. segment size
-    output_file << pgm.segments.size() << std::endl;
-    // 4. levels offset size
-    output_file << pgm.levels_offsets.size() << std::endl;
-    // 5. save container
+    output_file.write(reinterpret_cast<const char*>(&pgm.Epsilon), sizeof(pgm.Epsilon));
+    output_file.write(reinterpret_cast<const char*>(&pgm.EpsilonRecursive), sizeof(pgm.EpsilonRecursive));
+    output_file.write(reinterpret_cast<const char*>(&pgm.n), sizeof(pgm.n));
+    output_file.write(reinterpret_cast<const char*>(&pgm.first_key), sizeof(pgm.first_key));
+    int seg_size = pgm.segments.size();
+    output_file.write(reinterpret_cast<const char*>(&seg_size), sizeof(seg_size));
     for (auto& segment : pgm.segments) {
-      output_file << segment.key << " " << segment.slope << " " << segment.intercept << std::endl;
+      output_file.write(reinterpret_cast<const char*>(&segment.key), sizeof(segment.key));
+      output_file.write(reinterpret_cast<const char*>(&segment.slope), sizeof(segment.slope));
+      output_file.write(reinterpret_cast<const char*>(&segment.intercept), sizeof(segment.intercept));
     }
-    // 6. save levels offset
+    int lvl_size = pgm.levels_offsets.size();
+    output_file.write(reinterpret_cast<const char*>(&lvl_size), sizeof(lvl_size));
     for (auto& offset : pgm.levels_offsets) {
-      output_file << offset << std::endl;
+      output_file.write(reinterpret_cast<const char*>(&offset), sizeof(offset));
     }
+
+    output_file.close();
   }
   else if (adgMod::modelmode == 4)
   {
@@ -1316,25 +1317,35 @@ void LearnedIndexData::LoadLearnedModelNew(const std::string& filename) {
     // pgm
     std::ifstream input_file(filename, std::ios::binary);
     if (!input_file.good()) return;
-    // load members
-    int seg_size = 0, lvl_size = 0;
-    input_file >> pgm.n >> pgm.first_key >> seg_size >> lvl_size;
+    pgm = pgm::PGMIndex<uint64_t>();
+    input_file.read(reinterpret_cast<char*>(&pgm.Epsilon), sizeof(pgm.Epsilon));
+    input_file.read(reinterpret_cast<char*>(&pgm.EpsilonRecursive), sizeof(pgm.EpsilonRecursive));
+    input_file.read(reinterpret_cast<char*>(&pgm.n), sizeof(pgm.n));
+    input_file.read(reinterpret_cast<char*>(&pgm.first_key), sizeof(pgm.first_key));
+    int seg_size = 0;
+    input_file.read(reinterpret_cast<char*>(&seg_size), sizeof(seg_size));
     for (int i = 0; i < seg_size; ++i) {
       uint64_t key;
       float slope;
       int32_t intercept;
-      input_file >> key >> slope >> intercept;
+      input_file.read(reinterpret_cast<char*>(&key), sizeof(key));
+      input_file.read(reinterpret_cast<char*>(&slope), sizeof(slope));
+      input_file.read(reinterpret_cast<char*>(&intercept), sizeof(intercept));
       pgm.segments.push_back({key, slope, intercept});
     }
+    int lvl_size = 0;
+    input_file.read(reinterpret_cast<char*>(&lvl_size), sizeof(lvl_size));
     for (int i = 0; i < lvl_size; ++i) {
       uint64_t offset;
-      input_file >> offset;
+      input_file.read(reinterpret_cast<char*>(&offset), sizeof(offset));
       pgm.levels_offsets.push_back(offset);
     }
+    input_file.close();
   }
   else if (adgMod::modelmode == 4)
   {
     std::ifstream input_file(filename, std::ios::binary);
+    if (!input_file.good()) return;
     rmi::RmiLAbs<uint64_t, rmi::LinearSpline, rmi::LinearRegression> rmi_;
     rmi_.load(input_file);
     rmi = rmi_;
