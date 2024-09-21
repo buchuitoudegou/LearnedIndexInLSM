@@ -28,10 +28,8 @@ namespace adgMod {
 
 std::pair<uint64_t, uint64_t> LearnedIndexData::GetPosition(
     const Slice& target_x) const {
-  // std::cout<<"Getting position"<<std::endl;
   assert(string_segments.size() > 1);
   ++served;
-  // std::cout<<"current served"<<served<<std::endl;
   // check if the key is within the model bounds
   uint64_t target_int = SliceToInteger(target_x);
   if (target_int > max_key) return std::make_pair(size, size);
@@ -47,7 +45,6 @@ std::pair<uint64_t, uint64_t> LearnedIndexData::GetPosition(
       left = mid;
   }
 
-  // std::cout<<"Segment length:"<<size<<std::endl;
 
   // calculate the interval according to the selected segment
   uint64_t lower, upper;
@@ -55,17 +52,6 @@ std::pair<uint64_t, uint64_t> LearnedIndexData::GetPosition(
     double result = target_int * string_segments[left].k + string_segments[left].b;
     lower = result;
     upper = lower;
-    // lower = lower < size ? lower : size - 1;
-    // upper = upper < size ? upper : size - 1;
-    // lower = lower < size ? lower : size - 1;
-    // upper = upper < size ? upper : size - 1;
-      // double result = target_int * string_segments[left].k + string_segments[left].b;
-      // result = is_level ? result / 2 : result;
-      // lower =
-      //     result - error > 0 ? (uint64_t)std::floor(result - error) : 0;
-      // upper = (uint64_t)std::ceil(result + error);
-      // if (lower >= size) return std::make_pair(size, size);
-      // upper = upper < size ? upper : size - 1;
     if(is_level){
       double result = target_int * string_segments[left].k + string_segments[left].b;
       result = is_level ? result / 2 : result;
@@ -93,11 +79,6 @@ std::pair<uint64_t, uint64_t> LearnedIndexData::GetPosition(
       upper = (uint64_t)std::ceil(result + error);
       if (lower >= size) return std::make_pair(size, size);
       upper = upper < size ? upper : size - 1;
-      //                printf("%s %s %s\n", string_keys[lower].c_str(),
-      //                string(target_x.data(), target_x.size()).c_str(),
-      //                string_keys[upper].c_str()); assert(target_x >=
-      //                string_keys[lower] && target_x <= string_keys[upper]);
-
   }
 
   return std::make_pair(lower, upper);
@@ -144,10 +125,8 @@ bool LearnedIndexData::Learn(string filename) {
     max_key = atoll(string_keys.back().first.c_str());
     size = string_keys.size();
 
-    // std::cout<<"islevel? "<<is_level<<std::endl;
 
     // actual training
-    // std::vector<std::pair<std::string, int>> keys;
     long long last_key = 0;
     for(int i=0; i<count; i++){
         long long thiskey = stoll(string_keys[i].first);
@@ -164,13 +143,7 @@ bool LearnedIndexData::Learn(string filename) {
     segs.push_back((Segment){temp, 0, 0});
     string_segments = std::move(segs);
 
-    for (auto& str : string_segments) {
-      // printf("%s %f\n", str.first.c_str(), str.second);
-    }
-
     learned.store(true);
-    // string_keys.clear();
-    // return true;
   }
   else if(adgMod::modelmode == 1){
     // std::cout<<"LIPP learning"<<std::endl;
@@ -478,6 +451,7 @@ uint64_t LearnedIndexData::FileLearn(void* arg) {
   c->Ref();
   if (self->FillData(c, mas->meta)) {
     self->LearnFileNew(self->keys);
+    self->WriteLearnedModelNew(adgMod::db->versions_->dbname_ + "/" + fimename + ".fmodel");
     entered = true;
   } else {
     // std::cout<<"Data NOT Filled"<<std::endl;
@@ -1189,19 +1163,64 @@ uint64_t AccumulatedNumEntriesArray::NumEntries() const {
 }
 
 void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys) {
+  if (adgMod::modelmode == 0) {
+    // PLR
+    PLR plr = PLR(error);
+    uint64_t temp = keys.back();
+    min_key = keys.front();
+    max_key = temp;
+    size = keys.size();
+    uint64_t last_key = 0;
+    auto cur_keys = keys;
+    std::vector<std::pair<std::string, int>> skeys;
+    for (size_t i = 0; i < cur_keys.size(); ++i) {
+      long long thiskey = cur_keys[i];
+      if (i > 0 && last_key == thiskey) {
+        cur_keys[i] = last_key + 1;
+      }
+      last_key = cur_keys[i];
+      int is_first = i == 0;
+      skeys.push_back({std::to_string(cur_keys[i]), is_first});
+    }
+    std::vector<Segment> segments = plr.train(skeys, true);
+    if (segments.empty()) return;
+    segments.push_back((Segment){temp, 0, 0});
+    string_segments = std::move(segments);
+  }
   if (adgMod::modelmode == 3) {
     // pgm
     pgm::PGMIndex<uint64_t, PGM_Error, 4> index(keys.begin(), keys.end());
     pgm = index;
   }
+  if (adgMod::modelmode == 6) {
+    ts::Builder<long long int> rsb(keys.front(), keys.back(), error);
+    for (const auto& key : keys) rsb.AddKey(key);
+    ts = rsb.Finalize();
+  }
   learned.store(true);
 }
 
 void LearnedIndexData::WriteLearnedModelNew(const std::string& filename) {
+  if (adgMod::modelmode == 0) {
+    // PLR
+    std::ofstream output_file(filename, std::ios::binary);
+    output_file.precision(40);
+    // 1. min key
+    output_file << min_key << std::endl;
+    // 2. max key
+    output_file << max_key << std::endl;
+    // 3. size
+    output_file << size << std::endl;
+    // 4. segments
+    output_file << string_segments.size() << std::endl;
+    for (auto& segment : string_segments) {
+      output_file << segment.x << " " << segment.k << " " << segment.b << std::endl;
+    }
+  }
   if (adgMod::modelmode == 3) {
     // pgm
-    std::string index_name = filename;
-    std::ofstream output_file(index_name, std::ios::binary);
+    std::ofstream output_file(filename, std::ios::binary);
+    output_file.precision(40);
     // save members
     // 1. n
     output_file << pgm.n << std::endl;
@@ -1220,9 +1239,33 @@ void LearnedIndexData::WriteLearnedModelNew(const std::string& filename) {
       output_file << offset << std::endl;
     }
   }
+  if (adgMod::modelmode == 6) {
+    ts::Serializer<long long int> serializer;
+    std::string bytes;
+    serializer.ToBytes(ts, &bytes);
+    std::ofstream outFile(filename);
+    outFile << bytes;
+    outFile.close();
+  }
 }
 
 void LearnedIndexData::LoadLearnedModelNew(const std::string& filename) {
+  if (adgMod::modelmode == 0) {
+    // PLR
+    std::ifstream input_file(filename, std::ios::binary);
+    // load members
+    input_file >> min_key;
+    input_file >> max_key;
+    input_file >> size;
+    int seg_size = 0;
+    input_file >> seg_size;
+    for (int i = 0; i < seg_size; ++i) {
+      uint64_t x;
+      double k, b;
+      input_file >> x >> k >> b;
+      string_segments.emplace_back(x, k, b);
+    }
+  }
   if (adgMod::modelmode == 3) {
     // pgm
     std::string index_name = filename;
@@ -1242,6 +1285,30 @@ void LearnedIndexData::LoadLearnedModelNew(const std::string& filename) {
       input_file >> offset;
       pgm.levels_offsets.push_back(offset);
     }
+  }
+  if (adgMod::modelmode == 6) {
+     std::ifstream input_file(filename, std::ios::binary | std::ios::ate);
+    if (!input_file.good()) return;
+
+    // 获取文件大小
+    std::streamsize fileSize = input_file.tellg();
+    input_file.seekg(0, std::ios::beg);
+
+    // 创建一个缓冲区来存储整个文件内容
+    std::vector<char> buffer(fileSize);
+
+    // 读取整个文件到缓冲区
+    if (!input_file.read(buffer.data(), fileSize)) {
+      std::cerr << "Error reading file!" << std::endl;
+      return;
+    }
+    input_file.close();
+
+    // 将缓冲区内容转换为字符串
+    std::string fileContent(buffer.begin(), buffer.end());
+    ts::Serializer<long long int> serializer;
+    const auto rs_deserialized = serializer.FromBytes(fileContent);
+    ts = rs_deserialized;
   }
   learned.store(true);
 }
