@@ -963,6 +963,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
         else{
           j = mid;
         }
+        adgMod::bisearch_depth++;
       }
 
       // ParsedInternalKey parsed_key;

@@ -1046,6 +1046,7 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
     adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(meta->number);
     model->LearnFileNew(*keys);
     model->WriteLearnedModelNew(dbname_ + "/" + to_string(meta->number) + ".fmodel");
+    adgMod::newSST_count++;
   }
 
   if (s.ok() && current_entries > 0) {

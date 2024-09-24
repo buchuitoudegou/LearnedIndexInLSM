@@ -1162,6 +1162,7 @@ uint64_t AccumulatedNumEntriesArray::NumEntries() const {
 }
 
 void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys) {
+  auto start = std::chrono::steady_clock::now();
   if (adgMod::modelmode == 0) {
     // PLR
     PLR plr = PLR(error);
@@ -1215,9 +1216,14 @@ void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys) {
     ts = rsb.Finalize();
   }
   learned.store(true);
+  auto end = std::chrono::steady_clock::now();
+  if (!adgMod::fresh_write)
+    adgMod::learn_duration += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    adgMod::filelearn_count++;
 }
 
 void LearnedIndexData::WriteLearnedModelNew(const std::string& filename) {
+  auto start = std::chrono::steady_clock::now();
   if (adgMod::modelmode == 0) {
     // PLR
     std::ofstream output_file(filename, std::ios::binary);
@@ -1259,7 +1265,6 @@ void LearnedIndexData::WriteLearnedModelNew(const std::string& filename) {
     for (auto& offset : pgm.levels_offsets) {
       output_file.write(reinterpret_cast<const char*>(&offset), sizeof(offset));
     }
-
     output_file.close();
   }
   else if (adgMod::modelmode == 4)
@@ -1285,6 +1290,9 @@ void LearnedIndexData::WriteLearnedModelNew(const std::string& filename) {
     outFile << bytes;
     outFile.close();
   }
+  auto end = std::chrono::steady_clock::now();
+  if (!adgMod::fresh_write)
+    adgMod::write_model_duration += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 }
 
 void LearnedIndexData::LoadLearnedModelNew(const std::string& filename) {

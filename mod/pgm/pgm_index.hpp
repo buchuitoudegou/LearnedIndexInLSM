@@ -278,19 +278,21 @@ public:
      * Constructs the index on the given sorted vector.
      * @param data the vector of keys to be indexed, must be sorted
      */
-    explicit PGMIndex(const std::vector<K> &data, size_t Epsilon = 64, size_t EpsilonRecursive = 4) : PGMIndex(data.begin(), data.end(), Epsilon, EpsilonRecursive) {}
+    explicit PGMIndex(const std::vector<K> &data, size_t epsilon = 64, size_t eposilon_recursive = 4) : PGMIndex(data.begin(), data.end(), epsilon, eposilon_recursive) {}
 
     /**
      * Constructs the index on the sorted keys in the range [first, last).
      * @param first, last the range containing the sorted keys to be indexed
      */
     template<typename RandomIt>
-    PGMIndex(RandomIt first, RandomIt last, size_t Epsilon = 64, size_t EpsilonRecursive = 4)
+    PGMIndex(RandomIt first, RandomIt last, size_t epsilon = 64, size_t eposilon_recursive = 4)
         : n(std::distance(first, last)),
           first_key(n ? *first : K(0)),
           segments(),
+          Epsilon(epsilon),
+          EpsilonRecursive(eposilon_recursive),
           levels_offsets() {
-        build(first, last, Epsilon, EpsilonRecursive, segments, levels_offsets);
+        build(first, last, epsilon, eposilon_recursive, segments, levels_offsets);
     }
 
     template<typename RandomIt>
@@ -419,7 +421,7 @@ public:
      */
     size_t size_in_bytes() const { return segments.size() * sizeof(Segment) + levels_offsets.size() * sizeof(size_t); }
 
-    std::pair<uint64_t, uint64_t> get_epsilon() {
+    std::pair<size_t, size_t> get_epsilon() {
         return std::make_pair(Epsilon, EpsilonRecursive);
     }
 };
