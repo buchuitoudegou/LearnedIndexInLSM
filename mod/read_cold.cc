@@ -404,6 +404,8 @@ int main(int argc, char *argv[]) {
         if(compaction_policy==0) // leveling
         {
             options=GetLevelingOptions();
+            options.write_buffer_size = write_buffer_size;
+            options.max_bytes_for_level_base = write_buffer_size * T;
         }
         else if (compaction_policy == 1) // tiering
         {

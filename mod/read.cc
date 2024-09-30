@@ -447,6 +447,8 @@ int main(int argc, char *argv[]) {
         if(compaction_policy==0) // leveling
         {
             options=GetLevelingOptions();
+            options.write_buffer_size = write_buffer_size;
+            options.max_bytes_for_level_base = write_buffer_size * T;
         }
         else if (compaction_policy == 1) // tiering
         {
@@ -698,7 +700,8 @@ int main(int argc, char *argv[]) {
             }
             if(MOD==0)
             {
-                modelname="FencePointer-"+std::to_string(block_size);
+                modelname="FencePointer_"+std::to_string(block_size);
+                size_byte = FencePointersize;
             }
             // string datasetname = DatasetMap[dataset_no];
             // string workloadname = WorkloadMap[workload_no];
@@ -732,6 +735,7 @@ int main(int argc, char *argv[]) {
                 << ReadDuration / read_times << "\t"
                 << WriteDuration / write_times << "\t"
                 << 1.0*bisearch_depth/bisearch_counter<< endl;
+            cout << "raw data: " << std::endl;
             cout << exptag << "\t" << TrainTimeMicro << "\t"
                 << OPTimeMean / NUM_OP << "\t" << size_byte << "\t"
                 << adgMod::LoadModelDuration / NUM_RELOAD << "\t"
