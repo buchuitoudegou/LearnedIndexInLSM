@@ -1845,6 +1845,16 @@ namespace leveldb {
         }
     }
 
+    int Version::FileNumber2Level(uint64_t number) const{
+        for (int i = 0; i < config::kNumLevels; ++i) {
+            for (FileMetaData *file : files_[i]) {
+                if (file->number == number) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
 
     void Version::PrintAll() const {
         for (int i = 1; i < config::kNumLevels; ++i) {
@@ -1886,7 +1896,8 @@ namespace leveldb {
     }
 
     bool Version::FillData(const ReadOptions &options, FileMetaData *meta, adgMod::LearnedIndexData *data) {
-        return vset_->table_cache_->FillData(options, meta, data);
+        int level = FileNumber2Level(meta->number);
+        return vset_->table_cache_->FillData(options, meta, data, level);
     }
 
     bool Version::FillLevel(const ReadOptions &options, int level) {

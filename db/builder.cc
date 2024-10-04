@@ -60,7 +60,7 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
     if (s.ok()) {
       // Verify that the table is usable
       Iterator* it = table_cache->NewIterator(ReadOptions(), meta->number,
-                                              meta->file_size);
+                                              meta->file_size, 0);
       s = it->status();
       delete it;
     }

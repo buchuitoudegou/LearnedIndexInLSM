@@ -119,6 +119,8 @@ class Version {
   // Return a human readable string that describes this version's contents.
   std::string DebugString() const;
 
+  // get filenumber2level
+  int FileNumber2Level(uint64_t) const;
   // print level summary
   void PrintAll() const;
   void PrintLevelSummary() const;

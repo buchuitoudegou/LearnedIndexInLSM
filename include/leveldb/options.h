@@ -6,6 +6,7 @@
 #define STORAGE_LEVELDB_INCLUDE_OPTIONS_H_
 
 #include <stddef.h>
+#include <cmath>
 #include "mod/stats.h"
 
 #include "leveldb/export.h"
@@ -159,6 +160,19 @@ struct LEVELDB_EXPORT Options {
   int L0_compaction_trigger = 4; // default 4
 
   int max_logical_level = 4;
+
+  double base_bpk=0;
+  void set_monkey_filter(int level)
+  {
+      if (base_bpk <= 0) return;
+      // if (filter_policy != nullptr) delete filter_policy;
+      auto delta = std::log(max_bytes_for_level_multiplier) / std::log(2) / std::log(2);
+      double bpk = base_bpk - delta * level;
+      if (bpk < 0.5) 
+        filter_policy = nullptr;
+      else 
+        filter_policy = NewBloomFilterPolicy(std::round(bpk));
+  }
 };
 
 // Options that control read operations

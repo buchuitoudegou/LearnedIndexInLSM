@@ -542,15 +542,16 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Iterator* iter = mem->NewIterator();
   Log(options_.info_log, "Level-0 table #%llu: started",
       (unsigned long long)meta.number);
-
+  Options monkey_options = options_;
+  monkey_options.set_monkey_filter(0);
   Status s;
   {
     mutex_.Unlock();
-    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta, keys);
+    s = BuildTable(dbname_, env_, monkey_options, table_cache_, iter, &meta, keys);
     mutex_.Lock();
   }
 
-  Log(options_.info_log, "Level-0 table #%llu: %lld bytes %s",
+  Log(monkey_options.info_log, "Level-0 table #%llu: %lld bytes %s",
       (unsigned long long)meta.number, (unsigned long long)meta.file_size,
       s.ToString().c_str());
   delete iter;
@@ -976,8 +977,10 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
   // Make the output file
   std::string fname = TableFileName(dbname_, file_number);
   Status s = env_->NewWritableFile(fname, &compact->outfile);
+  Options monkey_options = options_;
+  monkey_options.set_monkey_filter(compact->compaction->level()+1);
   if (s.ok()) {
-    compact->builder = new TableBuilder(options_, compact->outfile);
+    compact->builder = new TableBuilder(monkey_options, compact->outfile);
   }
   return s;
 }
@@ -1787,7 +1790,7 @@ Status DB::Delete(const WriteOptions& opt, const Slice& key) {
 
 DB::~DB() {}
 
-Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
+Status DB::Open(Options& options, const std::string& dbname, DB** dbptr) {
   auto dbopenbeforeTime = std::chrono::steady_clock::now();
   *dbptr = nullptr;
 

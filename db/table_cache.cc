@@ -48,7 +48,7 @@ TableCache::TableCache(const std::string& dbname, const Options& options,
 TableCache::~TableCache() { delete cache_; }
 
 Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
-                             Cache::Handle** handle) {
+                             Cache::Handle** handle, int level) {
 
 //  adgMod::Stats* instance = adgMod::Stats::GetInstance();
 //
@@ -113,7 +113,9 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
 
 
     if (s.ok()) {
-      s = Table::Open(options_, file, file_size, &table);
+      Options monkey_options = options_;
+      // monkey_options.set_monkey_filter(level);
+      s = Table::Open(monkey_options, file, file_size, &table);
     }
 
     // std::cout<<"In FindTable status"<<s.ToString()<<std::endl;
@@ -137,13 +139,13 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
 
 Iterator* TableCache::NewIterator(const ReadOptions& options,
                                   uint64_t file_number, uint64_t file_size,
-                                  Table** tableptr) {
+                                  Table** tableptr, int level) {
   if (tableptr != nullptr) {
     *tableptr = nullptr;
   }
 
   Cache::Handle* handle = nullptr;
-  Status s = FindTable(file_number, file_size, &handle);
+  Status s = FindTable(file_number, file_size, &handle, level);
   if (!s.ok()) {
     return NewErrorIterator(s);
   }
@@ -191,7 +193,7 @@ Status TableCache::Get(const ReadOptions& options, uint64_t file_number,
 #ifdef INTERNAL_TIMER
   instance->StartTimer(1);
 #endif
-  Status s = FindTable(file_number, file_size, &handle);
+  Status s = FindTable(file_number, file_size, &handle, level);
 #ifdef INTERNAL_TIMER
   instance->PauseTimer(1);
 #endif
@@ -212,11 +214,11 @@ void TableCache::Evict(uint64_t file_number) {
   cache_->Erase(Slice(buf, sizeof(buf)));
 }
 
-bool TableCache::FillData(const ReadOptions& options, FileMetaData *meta, adgMod::LearnedIndexData* data) {
+bool TableCache::FillData(const ReadOptions& options, FileMetaData *meta, adgMod::LearnedIndexData* data, int level) {
     Cache::Handle* handle = nullptr;
     // std::cout<<"Filling file "<<meta->number<<" file_size "<<meta->file_size<<std::endl;
 
-    Status s = FindTable(meta->number, meta->file_size, &handle);
+    Status s = FindTable(meta->number, meta->file_size, &handle, level);
     
     if (s.ok()) {
         Table* table = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
@@ -312,7 +314,7 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
     adgMod::Stats* instance = adgMod::Stats::GetInstance();
     Cache::Handle* cache_handle = nullptr;
     auto start = std::chrono::steady_clock::now();
-    Status s = FindTable(file_number, file_size, &cache_handle);
+    Status s = FindTable(file_number, file_size, &cache_handle, level);
     adgMod::findtable_time+=std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start).count();
     TableAndFile* tf = reinterpret_cast<TableAndFile*>(cache_->Value(cache_handle));
     RandomAccessFile* file = tf->file;
@@ -397,9 +399,11 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       adgMod::prediction_range+=read_size;
 
       Slice entries;
+      auto beforeTime=std::chrono::steady_clock::now();
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
+      adgMod::IO_duration += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
       assert(s.ok());
-      auto beforeTime = std::chrono::steady_clock::now();
+      beforeTime = std::chrono::steady_clock::now();
       uint64_t left = pos_block_lower, right = pos_block_upper;
       while (left < right) {
         uint32_t mid = (left + right) / 2;
@@ -534,7 +538,9 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
       adgMod::prediction_range+=read_size;
       Slice entries;
+      beforeTime=std::chrono::steady_clock::now();
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
+      adgMod::IO_duration += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
       assert(s.ok());
       if(!s.ok()) std::cout<<"read done status: "<<s.ToString()<<std::endl;
 
@@ -635,7 +641,9 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
       adgMod::prediction_range+=read_size;
       Slice entries;
+      beforeTime=std::chrono::steady_clock::now();
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
+      adgMod::IO_duration += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
       assert(s.ok());
       if(!s.ok()) std::cout<<"read done status: "<<s.ToString()<<std::endl;
 
@@ -754,7 +762,9 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // printf("blockoffset: %lu\n", block_offset);
       // static char scratch[81920];
       Slice entries;
+      beforeTime=std::chrono::steady_clock::now();
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
+      adgMod::IO_duration += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
       assert(s.ok());
 
       uint64_t left = pos_block_lower, right = pos_block_upper;
@@ -875,7 +885,9 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // if(scratch==nullptr)
       //   scratch=(char*)malloc(100000000);
       Slice entries;
+      beforeTime=std::chrono::steady_clock::now();
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
+      adgMod::IO_duration += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
       assert(s.ok());
       beforeTime = std::chrono::steady_clock::now();   
       uint64_t left = pos_block_lower, right = pos_block_upper;
@@ -992,7 +1004,9 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // if(scratch==nullptr)
       //   scratch=(char*)malloc(100000000);
       Slice entries;
+      beforeTime=std::chrono::steady_clock::now();
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
+      adgMod::IO_duration += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
       assert(s.ok());
 
       uint64_t left = pos_block_lower, right = pos_block_upper;
@@ -1073,9 +1087,6 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       handle_result(arg, key, value);
       cache_->Release(cache_handle);
 
-    }
-    else if(adgMod::modelmode == 8){
-      
     }
     auto duration=std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now()-start_time).count();
     adgMod::LevelRead_duration+=duration;

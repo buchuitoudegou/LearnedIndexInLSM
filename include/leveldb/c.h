@@ -71,7 +71,7 @@ typedef struct leveldb_writeoptions_t leveldb_writeoptions_t;
 
 /* DB operations */
 
-LEVELDB_EXPORT leveldb_t* leveldb_open(const leveldb_options_t* options,
+LEVELDB_EXPORT leveldb_t* leveldb_open(leveldb_options_t* options,
                                        const char* name, char** errptr);
 
 LEVELDB_EXPORT void leveldb_close(leveldb_t* db);
