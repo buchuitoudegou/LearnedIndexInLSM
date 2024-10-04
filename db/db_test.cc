@@ -1709,7 +1709,8 @@ TEST(DBTest, DestroyOpenDB) {
 
 TEST(DBTest, Locking) {
   DB* db2 = nullptr;
-  Status s = DB::Open(CurrentOptions(), dbname_, &db2);
+  Options options = CurrentOptions();
+  Status s = DB::Open(options, dbname_, &db2);
   ASSERT_TRUE(!s.ok()) << "Locking did not prevent re-opening db";
 }
 
