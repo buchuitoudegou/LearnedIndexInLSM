@@ -149,7 +149,8 @@ enum LoadType {
 
 int main(int argc, char *argv[]) {
     int rc;
-    int num_operations, num_iteration, num_mix, block_size, write_buffer_size, max_file_size;
+    int num_operations, num_iteration, num_mix, write_buffer_size;
+    size_t max_file_size, block_size;
     float test_num_segments_base;
     float num_pair_step;
     string db_location, profiler_out, input_filename, distribution_filename, ycsb_filename, read_filename;
@@ -227,8 +228,8 @@ int main(int argc, char *argv[]) {
             ("file_model_error", "error in file model", cxxopts::value<uint32_t>(adgMod::file_model_error)->default_value("8"))
             ("level_model_error", "error in level model", cxxopts::value<uint32_t>(adgMod::level_model_error)->default_value("1"))
             ("f,input_file", "the filename of input file", cxxopts::value<string>(input_filename)->default_value(""))
-            ("blocksize", "block size in SSTables", cxxopts::value<int>(block_size)->default_value("4096"))
-            ("SST", "SST size", cxxopts::value<int>(max_file_size)->default_value("4194304"))
+            ("blocksize", "block size in SSTables", cxxopts::value<size_t>(block_size)->default_value("4096"))
+            ("SST", "SST size", cxxopts::value<size_t>(max_file_size)->default_value("4194304"))
             ("buffersize","db write buffer size", cxxopts::value<int>(write_buffer_size)->default_value("4194304"))
             ("r,read_file", "the filename of read file", cxxopts::value<string>(read_filename)->default_value(""))
             ("multiple", "test: use larger keys", cxxopts::value<uint64_t>(adgMod::key_multiple)->default_value("1"))
@@ -487,6 +488,11 @@ int main(int argc, char *argv[]) {
             adgMod::db->WaitForBackground();
             // reopen DB and do offline leraning
             if (print_file_info && iteration == 0) db->PrintFileInfo();
+            string expname = ExpMap[exp_no];
+            std::fstream res;
+            res.setf(std::ios::fixed,std::ios::floatfield);
+            res.open("/home/jiarui/LearnedIndexInLSM/evaluation/" + expname + ".out",std::ios::out|std::ios::app);
+            res << "bloom filter size: " << bloom_size << endl;
             cout << "bloom filter size: " << bloom_size << endl;
             delete db;
             if(inputlen>0)
@@ -606,10 +612,7 @@ int main(int argc, char *argv[]) {
             delete db;
             // Managing outputs
 
-            string expname = ExpMap[exp_no];
-            std::fstream res;
-            res.setf(std::ios::fixed,std::ios::floatfield);
-            res.open("/home/jiarui/LearnedIndexInLSM/evaluation/" + expname + ".out",std::ios::out|std::ios::app);
+            
             
             string modelname = ModelMap[adgMod::modelmode];
             if(modelmode==5)

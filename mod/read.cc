@@ -176,7 +176,8 @@ enum LoadType {
 
 int main(int argc, char *argv[]) {
     int rc;
-    int num_operations, num_iteration, num_mix, block_size, write_buffer_size, max_file_size;
+    int num_operations, num_iteration, num_mix, write_buffer_size;
+    size_t max_file_size, block_size;
     float test_num_segments_base;
     float num_pair_step;
     string db_location, profiler_out, input_filename, distribution_filename, ycsb_filename, read_filename;
@@ -262,8 +263,8 @@ int main(int argc, char *argv[]) {
             ("file_model_error", "error in file model", cxxopts::value<uint32_t>(adgMod::file_model_error)->default_value("8"))
             ("level_model_error", "error in level model", cxxopts::value<uint32_t>(adgMod::level_model_error)->default_value("1"))
             ("f,input_file", "the filename of input file", cxxopts::value<string>(input_filename)->default_value(""))
-            ("blocksize", "block size in SSTables", cxxopts::value<int>(block_size)->default_value("4096"))
-            ("SST", "SST size", cxxopts::value<int>(max_file_size)->default_value("4194304"))
+            ("blocksize", "block size in SSTables", cxxopts::value<size_t>(block_size)->default_value("4096"))
+            ("SST", "SST size", cxxopts::value<size_t>(max_file_size)->default_value("4194304"))
             ("buffersize","db write buffer size", cxxopts::value<int>(write_buffer_size)->default_value("4194304"))
             ("r,read_file", "the filename of read file", cxxopts::value<string>(read_filename)->default_value(""))
             ("multiple", "test: use larger keys", cxxopts::value<uint64_t>(adgMod::key_multiple)->default_value("1"))
@@ -598,8 +599,8 @@ int main(int argc, char *argv[]) {
                 auto OPTimeStart = std::chrono::steady_clock::now();
                 string value;
                 int operation_num = keys_read.size();
-                for(int i=0; i<NUM_OP; i++){
-                    if(i%int(NUM_OP/10) == 0){
+                for(int i=0; i<operation_num; i++){
+                    if(i%int(operation_num/10) == 0){
                         cout<<i<<" "<<keys_read[i].first<<" "<<keys_read[i].second<<endl;
                     }
                     get_times++;
@@ -663,7 +664,7 @@ int main(int argc, char *argv[]) {
 
             cout<<"Read complete"<<endl;
             current = adgMod::db->versions_->current();
-            int FencePointersize = ((options.max_file_size / options.block_size) +1) * key_size /2*3;
+            size_t FencePointersize = ((options.max_file_size / options.block_size) +1) * key_size /2*3;
             int file_num = current->GetFileNum();
             FencePointersize *= file_num; 
 
@@ -751,6 +752,7 @@ int main(int argc, char *argv[]) {
             //     << blockreader_bisearch_time << endl;
             // cout << index_block_time << " " << blockreader_create_time << " "
             //      << blockreader_bisearch_time << endl;
+            // res << findtable_time/prediction_counter <<endl;
             delete db;
         }
     }

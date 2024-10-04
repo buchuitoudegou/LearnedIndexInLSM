@@ -33,7 +33,7 @@ class BloomFilterPolicy : public FilterPolicy {
 
     // For small n, we can see a very high false positive rate.  Fix it
     // by enforcing a minimum bloom filter length.
-    if (bits < 64) bits = 64;
+    // if (bits < 64) bits = 64;
 
     size_t bytes = (bits + 7) / 8;
     bits = bytes * 8;

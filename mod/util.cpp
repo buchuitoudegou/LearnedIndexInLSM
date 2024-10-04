@@ -53,7 +53,7 @@ namespace adgMod {
     bool block_num_entries_recorded = false;
     bool level_learning_enabled = true;
     bool file_learning_enabled = true;
-    bool load_level_model = true;
+    bool load_level_model = false;
     bool load_file_model = true;
     uint64_t block_num_entries = 0;
     uint64_t block_size = 0;
@@ -127,6 +127,7 @@ namespace adgMod {
     double index_block_time=0;
     double blockreader_create_time=0;
     double blockreader_bisearch_time=0;
+    double findtable_time=0;
 
     uint64_t ExtractInteger(const char* pos, size_t size) {
         char* temp = new char[size + 1];

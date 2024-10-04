@@ -311,7 +311,9 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
 
     adgMod::Stats* instance = adgMod::Stats::GetInstance();
     Cache::Handle* cache_handle = nullptr;
+    auto start = std::chrono::steady_clock::now();
     Status s = FindTable(file_number, file_size, &cache_handle);
+    adgMod::findtable_time+=std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start).count();
     TableAndFile* tf = reinterpret_cast<TableAndFile*>(cache_->Value(cache_handle));
     RandomAccessFile* file = tf->file;
     FilterBlockReader* filter = tf->table->rep_->filter;
