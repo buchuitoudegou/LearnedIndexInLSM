@@ -671,7 +671,8 @@ int main(int argc, char *argv[]) {
             }
             if(MOD==0)
             {
-                modelname="FencePointer-"+std::to_string(block_size);
+                modelname="FencePointer_"+std::to_string(block_size);
+                size_byte = FencePointersize;
             }
             // string datasetname = DatasetMap[dataset_no];
             // string workloadname = WorkloadMap[workload_no];
@@ -706,6 +707,7 @@ int main(int argc, char *argv[]) {
                 << WriteDuration / write_times << "\t"
                 << 1.0*bisearch_depth/bisearch_counter << "\t"
                 << IO_duration/bisearch_counter << endl;
+            cout << "raw data: " << std::endl;
             cout << exptag << "\t" << TrainTimeMicro << "\t"
                 << OPTimeMean / get_times << "\t" << size_byte << "\t"
                 << adgMod::LoadModelDuration / NUM_RELOAD << "\t"
