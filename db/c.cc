@@ -161,7 +161,7 @@ static char* CopyString(const std::string& str) {
   return result;
 }
 
-leveldb_t* leveldb_open(const leveldb_options_t* options, const char* name,
+leveldb_t* leveldb_open(leveldb_options_t* options, const char* name,
                         char** errptr) {
   DB* db;
   if (SaveError(errptr, DB::Open(options->rep, std::string(name), &db))) {

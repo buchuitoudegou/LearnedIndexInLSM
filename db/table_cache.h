@@ -47,7 +47,7 @@ class TableCache {
   // by the cache and should not be deleted, and is valid for as long as the
   // returned iterator is live.
   Iterator* NewIterator(const ReadOptions& options, uint64_t file_number,
-                        uint64_t file_size, Table** tableptr = nullptr);
+                        uint64_t file_size, Table** tableptr = nullptr, int level = 0);
 
   // If a seek to internal key "k" in specified file finds an entry,
   // call (*handle_result)(arg, found_key, found_value).
@@ -61,7 +61,7 @@ class TableCache {
   void Evict(uint64_t file_number);
 
   // fill file data (all keys in this file)
-  bool FillData(const ReadOptions& options, FileMetaData* meta, adgMod::LearnedIndexData* data);
+  bool FillData(const ReadOptions& options, FileMetaData* meta, adgMod::LearnedIndexData* data, int level);
 
   // Bourbon path for Get Request
   void LevelRead(const ReadOptions& options, uint64_t file_number,
@@ -71,7 +71,7 @@ class TableCache {
 
 
  private:
-  Status FindTable(uint64_t file_number, uint64_t file_size, Cache::Handle**);
+  Status FindTable(uint64_t file_number, uint64_t file_size, Cache::Handle**, int level);
   Cache::Handle* FindFile(const ReadOptions& options, uint64_t file_number, uint64_t file_size);
 
   Env* const env_;

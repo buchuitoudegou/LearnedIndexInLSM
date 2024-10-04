@@ -544,7 +544,7 @@ class PosixEnv : public Env {
       return PosixError(filename, errno);
     }
 
-    if (!mmap_limiter_.Acquire() || filename.find("vlog") != std::string::npos) {
+    if (!mmap_limiter_.Acquire() || filename.find("ldb") != std::string::npos) {
       posix_fadvise(fd, 0, 0, POSIX_FADV_RANDOM);
       *result = new PosixRandomAccessFile(filename, fd, &fd_limiter_);
       return Status::OK();

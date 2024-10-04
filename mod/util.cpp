@@ -127,6 +127,7 @@ namespace adgMod {
     double index_block_time=0;
     double blockreader_create_time=0;
     double blockreader_bisearch_time=0;
+    double IO_duration=0;
 
     uint64_t ExtractInteger(const char* pos, size_t size) {
         char* temp = new char[size + 1];

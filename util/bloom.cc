@@ -8,6 +8,7 @@
 #include "util/hash.h"
 #include "mod/util.h"
 #include <iostream>
+#include "mod/util.h"
 
 namespace leveldb {
 
@@ -18,7 +19,7 @@ static uint32_t BloomHash(const Slice& key) {
 
 class BloomFilterPolicy : public FilterPolicy {
  public:
-  explicit BloomFilterPolicy(int bits_per_key) : bits_per_key_(bits_per_key) {
+  explicit BloomFilterPolicy(double bits_per_key) : bits_per_key_(bits_per_key) {
     // We intentionally round down to reduce probing cost a little bit
     k_ = static_cast<size_t>(bits_per_key * 0.69);  // 0.69 =~ ln(2)
     if (k_ < 1) k_ = 1;
@@ -28,13 +29,20 @@ class BloomFilterPolicy : public FilterPolicy {
   virtual const char* Name() const { return "leveldb.BuiltinBloomFilter2"; }
 
   virtual void CreateFilter(const Slice* keys, int n, std::string* dst) const {
+    Slice* mkey = const_cast<Slice*>(keys);
+    if(mkey->size()==adgMod::key_size+8)
+      for (int i = 0; i < n; i++) {
+        mkey[i] = ExtractUserKey(keys[i]);
+      }
     // Compute bloom filter size (in both bits and bytes)
     size_t bits = n * bits_per_key_;
 
     // For small n, we can see a very high false positive rate.  Fix it
     // by enforcing a minimum bloom filter length.
-    if (bits < 64) bits = 64;
-
+    // if (bits < 64) bits = 64;
+    // if(k_!=int(bits_per_key_*0.69)){
+    //   std::cout<<"bits_per_key_:"<<bits_per_key_<<" k_:"<<k_<<std::endl;
+    // }
     size_t bytes = (bits + 7) / 8;
     bits = bytes * 8;
     adgMod::bloom_size+=bytes;
@@ -76,19 +84,20 @@ class BloomFilterPolicy : public FilterPolicy {
     const uint32_t delta = (h >> 17) | (h << 15);  // Rotate right 17 bits
     for (size_t j = 0; j < k; j++) {
       const uint32_t bitpos = h % bits;
-      if ((array[bitpos / 8] & (1 << (bitpos % 8))) == 0) return false;
+      if ((array[bitpos / 8] & (1 << (bitpos % 8))) == 0) 
+        return false;
       h += delta;
     }
     return true;
   }
 
  private:
-  size_t bits_per_key_;
+  double bits_per_key_;
   size_t k_;
 };
 }  // namespace
 
-const FilterPolicy* NewBloomFilterPolicy(int bits_per_key) {
+const FilterPolicy* NewBloomFilterPolicy(double bits_per_key) {
   return new BloomFilterPolicy(bits_per_key);
 }
 

@@ -41,6 +41,7 @@ int mix_base = 20;
 int buffer_size = 4*1024*1024;
 int T = 10;
 int num_levels = 5;
+double base_bpk = 0;
 
 leveldb::Options GetLevelingOptions() {
   leveldb::Options options;
@@ -51,7 +52,7 @@ leveldb::Options GetLevelingOptions() {
   options.max_bytes_for_level_multiplier = T;
   options.max_logical_level = num_levels;
   options.max_file_size = 10 * (1<<20); // 10MB
-
+  options.base_bpk = base_bpk;
   
   leveldb::config::kL0_CompactionTrigger = 2;
   leveldb::config::kL0_SlowdownWritesTrigger = 2;
@@ -70,6 +71,7 @@ leveldb::Options GetTieringOptions() {
   options.max_logical_level = num_levels;
   options.max_file_size = 10 * (1<<20); // 10MB
   options.compaction_policy = leveldb::kCompactionStyleTier;
+  options.base_bpk = base_bpk;
 
   leveldb::config::kL0_CompactionTrigger = T;
   leveldb::config::kL0_SlowdownWritesTrigger = T + 2;
@@ -88,6 +90,7 @@ leveldb::Options GetLazyLevelOptions() {
   options.max_logical_level = num_levels;
   options.max_file_size = 10 * (1<<20); // 10MB
   options.compaction_policy = leveldb::kCompactionStyleLazyLevel;
+  options.base_bpk = base_bpk;
 
   leveldb::config::kL0_CompactionTrigger = T;
   leveldb::config::kL0_SlowdownWritesTrigger = T + 2;
@@ -262,6 +265,7 @@ int main(int argc, char *argv[]) {
             ("exp","name of workload", cxxopts::value<int>(exp_no)->default_value("0"))
             ("range", "use range query and specify length", cxxopts::value<int>(length_range)->default_value("0"))
             ("output", "output key list", cxxopts::value<string>(output)->default_value("key_list.txt"))
+            ("monkey", "monkey bpk of level 0, set to 0 to disable", cxxopts::value<double>(base_bpk)->default_value("0"))
             ("compactionpolicy", "LevelDB Compaction Policy", cxxopts::value<int>(compaction_policy)->default_value("0"));
     auto result = commandline_options.parse(argc, argv);
     if (result.count("help")) {
@@ -485,7 +489,12 @@ int main(int argc, char *argv[]) {
             adgMod::db->WaitForBackground();
             // reopen DB and do offline leraning
             if (print_file_info && iteration == 0) db->PrintFileInfo();
+            std::fstream res;
+            res.setf(std::ios::fixed,std::ios::floatfield);
+            res.open("/home/jiarui/LearnedIndexInLSM/evaluation/PointQuery.out",std::ios::out|std::ios::app);
+            res << "bloom filter size: " << bloom_size << endl;
             cout << "bloom filter size: " << bloom_size << endl;
+            res.close();
             delete db;
             if(inputlen>0)
                 return 0;
@@ -605,7 +614,7 @@ int main(int argc, char *argv[]) {
             // Managing outputs
 
             string expname = ExpMap[exp_no];
-            std::fstream res;
+            // std::fstream res;
             res.setf(std::ios::fixed,std::ios::floatfield);
             res.open("/home/jiarui/LearnedIndexInLSM/evaluation/" + expname + ".out",std::ios::out|std::ios::app);
             

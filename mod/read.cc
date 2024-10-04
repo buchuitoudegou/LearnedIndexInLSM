@@ -42,6 +42,7 @@ int mix_base = 20;
 int buffer_size = 2*1024*1024;
 int T = 10;
 int num_levels = 5;
+double base_bpk = 0;
 
 leveldb::Options GetLevelingOptions() {
   leveldb::Options options;
@@ -52,7 +53,7 @@ leveldb::Options GetLevelingOptions() {
   options.max_bytes_for_level_multiplier = T;
   options.max_logical_level = num_levels;
   options.max_file_size = 10 * (1<<20); // 10MB
-
+  options.base_bpk = base_bpk;
   
   leveldb::config::kL0_CompactionTrigger = 2;
   leveldb::config::kL0_SlowdownWritesTrigger = 2;
@@ -71,6 +72,7 @@ leveldb::Options GetTieringOptions() {
   options.max_logical_level = num_levels;
   options.max_file_size = 10 * (1<<20); // 10MB
   options.compaction_policy = leveldb::kCompactionStyleTier;
+  options.base_bpk = base_bpk;
 
   leveldb::config::kL0_CompactionTrigger = T;
   leveldb::config::kL0_SlowdownWritesTrigger = T + 2;
@@ -89,6 +91,7 @@ leveldb::Options GetLazyLevelOptions() {
   options.max_logical_level = num_levels;
   options.max_file_size = 10 * (1<<20); // 10MB
   options.compaction_policy = leveldb::kCompactionStyleLazyLevel;
+  options.base_bpk = base_bpk;
 
   leveldb::config::kL0_CompactionTrigger = T;
   leveldb::config::kL0_SlowdownWritesTrigger = T + 2;
@@ -296,6 +299,7 @@ int main(int argc, char *argv[]) {
             ("exp","name of workload", cxxopts::value<int>(exp_no)->default_value("0"))
             ("range", "use range query and specify length", cxxopts::value<int>(length_range)->default_value("0"))
             ("output", "output key list", cxxopts::value<string>(output)->default_value("key_list.txt"))
+            ("monkey", "monkey bpk of level 0, set to 0 to disable", cxxopts::value<double>(base_bpk)->default_value("0"))
             ("compactionpolicy", "LevelDB Compaction Policy", cxxopts::value<int>(compaction_policy)->default_value("0"));
     auto result = commandline_options.parse(argc, argv);
     if (result.count("help")) {
@@ -447,6 +451,8 @@ int main(int argc, char *argv[]) {
         if(compaction_policy==0) // leveling
         {
             options=GetLevelingOptions();
+            options.write_buffer_size = write_buffer_size;
+            options.max_bytes_for_level_base = write_buffer_size * T;
         }
         else if (compaction_policy == 1) // tiering
         {
@@ -467,22 +473,12 @@ int main(int argc, char *argv[]) {
         cout<<"Block size: "<<options.block_size<<endl;
         cout<<"Table size: "<<options.max_file_size<<endl;
         cout<<"Write buffer size: "<<options.write_buffer_size<<endl;
-        // options.block_size = options.max_file_size;
-        //options.comparator = new NumericalComparator;
-        //adgMod::block_restart_interval = options.block_restart_interval = adgMod::MOD == 8 || adgMod::MOD == 7 ? 1 : adgMod::block_restart_interval;
         read_options.fill_cache = false;
         write_options.sync = false;
         instance->ResetAll();
 
 
         if (fresh_write && iteration == 0) {
-//             // Load DB
-            // clear existing directory, clear page cache, trim SSD
-        //     string command = "rm -rf " + db_location;
-        //     rc = system(command.c_str());
-        //    rc = system("sudo fstrim -a -v");
-        //    rc = system("sync; echo 3 | sudo tee /proc/sys/vm/drop_caches");
-        //    cout << "delete and trim complete" << endl;
             string delete_models = "find " + db_location + " -type f -name \"*.fmodel\" -delete";
             std::cout<<delete_models<<std::endl;
             rc = system(delete_models.c_str());
@@ -505,23 +501,6 @@ int main(int argc, char *argv[]) {
             // db->PrintFileInfo();
             cout<<db<<endl;
 
-            // perform loadi
-            for (int i = 0; i < keys.size(); ++i) {
-                    // cout << keys[i] << endl;
-                    // status = db->Put(write_options, keys[i], {values.data() + uniform_dist_value(e2), (uint64_t) adgMod::value_size});
-                    assert(status.ok() && "File Put Error");
-                    break;
-            }
-            cout << "Put Complete ready to sync" << endl;
-            // adgMod::db->vlog->Sync();
-            cout << "Put Complete" << endl;
-
-            // ofstream fd;
-            // fd.open(db_location + "/" + output);
-            // for (int i = 0; i < keys.size(); ++i)
-            //     fd << keys[i] << "\n";
-            // fd.close();
-
             keys.clear();
             
             sleep(1);
@@ -536,12 +515,6 @@ int main(int argc, char *argv[]) {
             auto TrainTimeStart = std::chrono::steady_clock::now();
             if (adgMod::MOD == 6 || adgMod::MOD == 7 || adgMod::MOD == 9) {
                 Version* current = adgMod::db->versions_->current();
-
-                // offline level learning
-                // for (int i = 1; i < config::kNumLevels; ++i) {
-                //     LearnedIndexData::LevelLearn(new VersionAndSelf{current, adgMod::db->version_count, current->learned_index_data_[i].get(), i});
-                // }
-
                 // offline file learning
                 cout << "File Learning..." << endl;
                 current->FileLearn();
@@ -596,8 +569,8 @@ int main(int argc, char *argv[]) {
                 auto OPTimeStart = std::chrono::steady_clock::now();
                 string value;
                 int operation_num = keys_read.size();
-                for(int i=0; i<NUM_OP; i++){
-                    if(i%int(NUM_OP/10) == 0){
+                for(int i=0; i<operation_num; i++){
+                    if(i%int(operation_num/10) == 0){
                         cout<<i<<" "<<keys_read[i].first<<" "<<keys_read[i].second<<endl;
                     }
                     get_times++;
@@ -723,7 +696,7 @@ int main(int argc, char *argv[]) {
                 << compaction_size_outputs << "/" << compaction_size_inputs
                 << endl;
             res << exptag << "\t" << TrainTimeMicro << "\t"
-                << OPTimeMean / NUM_OP << "\t" << size_byte << "\t"
+                << OPTimeMean / get_times << "\t" << size_byte << "\t"
                 << adgMod::LoadModelDuration / NUM_RELOAD << "\t"
                 << get_avg_LevelRead_duration() << "\t"
                 << get_avg_prediction_duration() << "\t"
@@ -731,9 +704,10 @@ int main(int argc, char *argv[]) {
                 << get_avg_prediction_range() << "\t"
                 << ReadDuration / read_times << "\t"
                 << WriteDuration / write_times << "\t"
-                << 1.0*bisearch_depth/bisearch_counter<< endl;
+                << 1.0*bisearch_depth/bisearch_counter << "\t"
+                << IO_duration/bisearch_counter << endl;
             cout << exptag << "\t" << TrainTimeMicro << "\t"
-                << OPTimeMean / NUM_OP << "\t" << size_byte << "\t"
+                << OPTimeMean / get_times << "\t" << size_byte << "\t"
                 << adgMod::LoadModelDuration / NUM_RELOAD << "\t"
                 << get_avg_LevelRead_duration() << "\t"
                 << get_avg_prediction_duration() << "\t"
@@ -741,12 +715,13 @@ int main(int argc, char *argv[]) {
                 << get_avg_prediction_range() << "\t"
                 << ReadDuration / read_times << "\t"
                 << WriteDuration / write_times << "\t"
-                << 1.0*bisearch_depth/bisearch_counter<< endl;
+                << 1.0*bisearch_depth/bisearch_counter << "\t"
+                << IO_duration/bisearch_counter << endl;
 
             // res << index_block_time << " " << blockreader_create_time << " "
-            //     << blockreader_bisearch_time << endl;
+            //     << blockreader_bisearch_time << " "<< IO_duration/bisearch_counter << endl;
             // cout << index_block_time << " " << blockreader_create_time << " "
-            //      << blockreader_bisearch_time << endl;
+            //     << blockreader_bisearch_time << " "<< IO_duration/bisearch_counter << endl;
             delete db;
         }
     }
