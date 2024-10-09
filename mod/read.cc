@@ -674,6 +674,7 @@ int main(int argc, char *argv[]) {
             {
                 modelname="FencePointer_"+std::to_string(block_size);
                 size_byte = FencePointersize;
+                write_model_duration=writeindexblock_time;
             }
             // string datasetname = DatasetMap[dataset_no];
             // string workloadname = WorkloadMap[workload_no];
