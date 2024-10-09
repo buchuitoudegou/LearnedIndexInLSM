@@ -160,6 +160,7 @@ namespace adgMod {
     extern double blockreader_bisearch_time;
     extern double IO_duration;
     extern double findtable_time;
+    extern double error_multiplier;
 
     // some util functions
     uint64_t ExtractInteger(const char* pos, size_t size);
