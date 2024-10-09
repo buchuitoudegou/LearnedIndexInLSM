@@ -301,6 +301,7 @@ int main(int argc, char *argv[]) {
             ("range", "use range query and specify length", cxxopts::value<int>(length_range)->default_value("0"))
             ("output", "output key list", cxxopts::value<string>(output)->default_value("key_list.txt"))
             ("monkey", "monkey bpk of level 0, set to 0 to disable", cxxopts::value<double>(base_bpk)->default_value("0"))
+            ("errormultiplier","error multiplier", cxxopts::value<double>(adgMod::error_multiplier)->default_value("1"))
             ("compactionpolicy", "LevelDB Compaction Policy", cxxopts::value<int>(compaction_policy)->default_value("0"));
     auto result = commandline_options.parse(argc, argv);
     if (result.count("help")) {
@@ -726,7 +727,7 @@ int main(int argc, char *argv[]) {
             //     << blockreader_bisearch_time << " "<< IO_duration/bisearch_counter << endl;
             // cout << index_block_time << " " << blockreader_create_time << " "
             //     << blockreader_bisearch_time << " "<< IO_duration/bisearch_counter << endl;
-            // res << findtable_time/prediction_counter <<endl;
+            // res << findtable_time/ read_times <<endl;
             delete db;
         }
     }

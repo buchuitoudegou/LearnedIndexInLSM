@@ -449,7 +449,7 @@ uint64_t LearnedIndexData::FileLearn(void* arg) {
   Version* c = db->versions_->current();
   c->Ref();
   if (self->FillData(c, mas->meta)) {
-    self->LearnFileNew(self->keys);
+    self->LearnFileNew(self->keys, self->level);
     self->WriteLearnedModelNew(adgMod::db_name+"/"+std::to_string(meta->number)+".fmodel");
     entered = true;
   } else {
@@ -1161,8 +1161,10 @@ uint64_t AccumulatedNumEntriesArray::NumEntries() const {
   return array.empty() ? 0 : array.back().first;
 }
 
-void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys) {
+void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys, int level) {
   auto start = std::chrono::steady_clock::now();
+  auto level_error = error;
+  for (int i = 0; i < level; i++) level_error *= error_multiplier;
   if (adgMod::modelmode == 0) {
     // PLR
     PLR plr = PLR(error);
@@ -1189,7 +1191,7 @@ void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys) {
   }
   else if (adgMod::modelmode == 2)
   {
-    FitingTree<uint64_t> ft(keys, error);
+    FitingTree<uint64_t> ft(keys, level_error);
     ft_index = ft;
   }
   else if (adgMod::modelmode == 3) {

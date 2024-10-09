@@ -165,7 +165,7 @@ namespace adgMod {
         void ReadModel(const string& filename);
 
         // learn a single file (used in compaction)
-        void LearnFileNew(const std::vector<uint64_t>& keys);
+        void LearnFileNew(const std::vector<uint64_t>& keys, int level);
         void WriteLearnedModelNew(const std::string& filenum);
         void LoadLearnedModelNew(const std::string& filenum);
         
