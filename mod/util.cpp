@@ -130,6 +130,8 @@ namespace adgMod {
     double IO_duration=0;
     double findtable_time=0;
     double error_multiplier=10;
+    double writeindexblock_time=0;
+    vector<pair<double,size_t>> level_prediction{{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0}};
     size_t epsilonR=4;
 
     uint64_t ExtractInteger(const char* pos, size_t size) {

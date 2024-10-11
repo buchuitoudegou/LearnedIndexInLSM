@@ -198,6 +198,7 @@ Status TableCache::Get(const ReadOptions& options, uint64_t file_number,
   instance->PauseTimer(1);
 #endif
   if (s.ok()) {
+      adgMod::level_prediction[level].second++;
       Table* t = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
       s = t->InternalGet(options, k, arg, handle_result, level, meta, lower, upper, learned, version);
       cache_->Release(handle);
@@ -397,6 +398,8 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // Read corresponding entries
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
       adgMod::prediction_range+=read_size;
+      adgMod::level_prediction[level].first+=read_size;
+      adgMod::level_prediction[level].second+=1;
 
       Slice entries;
       auto beforeTime=std::chrono::steady_clock::now();
@@ -527,16 +530,18 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // ParsedInternalKey parsed_key;
       ParseInternalKey(k, &parsed_key);
       uint64_t block_offset = i * adgMod::block_size;
-      if (filter != nullptr && !filter->KeyMayMatch(block_offset, k)) {
-        cache_->Release(cache_handle);
-        return;
-      }
+      // if (filter != nullptr && !filter->KeyMayMatch(block_offset, k)) {
+      //   cache_->Release(cache_handle);
+      //   return;
+      // }
       // Get the interval within the data block that the target key may lie in
       size_t pos_block_lower = i == index_lower ? lower % adgMod::block_num_entries : 0;
       size_t pos_block_upper = i == index_upper ? upper % adgMod::block_num_entries : adgMod::block_num_entries - 1;
 
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
       adgMod::prediction_range+=read_size;
+      adgMod::level_prediction[level].first+=read_size;
+      adgMod::level_prediction[level].second+=1;
       Slice entries;
       beforeTime=std::chrono::steady_clock::now();
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
@@ -640,6 +645,8 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
 
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
       adgMod::prediction_range+=read_size;
+      adgMod::level_prediction[level].first+=read_size;
+      adgMod::level_prediction[level].second+=1;
       Slice entries;
       beforeTime=std::chrono::steady_clock::now();
       s = file->Read(block_offset + pos_block_lower * adgMod::entry_size, read_size, &entries, scratch);
@@ -758,6 +765,8 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // std::cout<<"Key:"<<adgMod::SliceToInteger(parsed_key.user_key)<<"bisearch bound:"<< pos_block_lower<<" "<<pos_block_upper<<std::endl;
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
       adgMod::prediction_range+=read_size;
+      adgMod::level_prediction[level].first+=read_size;
+      adgMod::level_prediction[level].second+=1;
       // printf("here is read size: %zu, and entry entries: %lu\n", pos_block_upper - pos_block_lower + 1, adgMod::entry_size);
       // printf("blockoffset: %lu\n", block_offset);
       // static char scratch[81920];
@@ -879,6 +888,8 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // std::cout<<"Key:"<<adgMod::SliceToInteger(parsed_key.user_key)<<"bisearch bound:"<< pos_block_lower<<" "<<pos_block_upper<<std::endl;
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
       adgMod::prediction_range+=read_size;
+      adgMod::level_prediction[level].first+=read_size;
+      adgMod::level_prediction[level].second+=1;
       // printf("here is read size: %zu, and entry entries: %lu\n", pos_block_upper - pos_block_lower + 1, adgMod::entry_size);
       // printf("blockoffset: %lu\n", block_offset);
       // static char* scratch = nullptr;
@@ -998,6 +1009,8 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // std::cout<<"Key:"<<adgMod::SliceToInteger(parsed_key.user_key)<<"bisearch bound:"<< pos_block_lower<<" "<<pos_block_upper<<std::endl;
       size_t read_size = (pos_block_upper - pos_block_lower + 1) * adgMod::entry_size;
       adgMod::prediction_range+=read_size;
+      adgMod::level_prediction[level].first+=read_size;
+      adgMod::level_prediction[level].second+=1;
       // printf("here is read size: %zu, and entry entries: %lu\n", pos_block_upper - pos_block_lower + 1, adgMod::entry_size);
       // printf("blockoffset: %lu\n", block_offset);
       // static char* scratch = nullptr;

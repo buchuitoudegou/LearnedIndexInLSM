@@ -161,6 +161,8 @@ namespace adgMod {
     extern double IO_duration;
     extern double findtable_time;
     extern double error_multiplier;
+    extern double writeindexblock_time;
+    extern vector<std::pair<double,size_t>> level_prediction;
     extern size_t epsilonR;
 
     // some util functions

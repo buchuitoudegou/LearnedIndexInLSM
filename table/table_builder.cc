@@ -15,6 +15,7 @@
 #include "table/format.h"
 #include "util/coding.h"
 #include "util/crc32c.h"
+#include "mod/util.h"
 
 namespace leveldb {
 
@@ -228,6 +229,7 @@ Status TableBuilder::Finish() {
   }
 
   // Write index block
+  auto start = std::chrono::steady_clock::now();
   if (ok()) {
     if (r->pending_index_entry) {
       //r->options.comparator->FindShortSuccessor(&r->last_key);
@@ -238,6 +240,7 @@ Status TableBuilder::Finish() {
     }
     WriteBlock(&r->index_block, &index_block_handle);
   }
+  adgMod::writeindexblock_time+=std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
 
   // Write footer
   if (ok()) {

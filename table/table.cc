@@ -229,6 +229,7 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
     auto start = std::chrono::steady_clock::now();
     iiter->Seek(k);
     adgMod::index_block_time+=std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start).count();
+    adgMod::prediction_counter++;
 #ifdef INTERNAL_TIMER
     instance->PauseTimer(2);
 #endif
@@ -264,6 +265,7 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
         start = std::chrono::steady_clock::now();
         block_iter->Seek(k);
         adgMod::blockreader_bisearch_time+=std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start).count();
+        adgMod::bisearch_counter++;
 #ifdef INTERNAL_TIMER
         instance->PauseTimer(3);
 #endif
