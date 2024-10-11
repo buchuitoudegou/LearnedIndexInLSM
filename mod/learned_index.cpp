@@ -1196,7 +1196,7 @@ void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys, int level
   }
   else if (adgMod::modelmode == 3) {
     // pgm
-    pgm::PGMIndex<uint64_t> index(keys.begin(), keys.end(),error,4);
+    pgm::PGMIndex<uint64_t> index(keys.begin(), keys.end(),error,adgMod::epsilonR);
     pgm = index;
   }
   else if (adgMod::modelmode == 4)

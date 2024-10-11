@@ -161,6 +161,7 @@ namespace adgMod {
     extern double IO_duration;
     extern double findtable_time;
     extern double error_multiplier;
+    extern size_t epsilonR;
 
     // some util functions
     uint64_t ExtractInteger(const char* pos, size_t size);

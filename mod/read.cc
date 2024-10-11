@@ -289,6 +289,7 @@ int main(int argc, char *argv[]) {
             ("insert", "insert new value", cxxopts::value<int>(insert_bound)->default_value("0"))
             ("modelmode", "mm=0 plr, mm=1 lipp", cxxopts::value<int>(adgMod::modelmode)->default_value("0"))
             ("RSbits","RS radix bits",cxxopts::value<int>(adgMod::RSbits)->default_value("18"))
+            ("epsilonR", "epsilon recursive for PGM", cxxopts::value<size_t>(adgMod::epsilonR)->default_value("4"))
             ("rmisize","RMI layer2 size",cxxopts::value<int>(adgMod::rmi_layer_size)->default_value("1024"))
             ("lippgap","lipp gap", cxxopts::value<int>(adgMod::lipp_gap)->default_value("5"))
             ("alexnodesize","alex max node size",cxxopts::value<int>(adgMod::alex_node_size)->default_value("2048"))

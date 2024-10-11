@@ -130,6 +130,7 @@ namespace adgMod {
     double IO_duration=0;
     double findtable_time=0;
     double error_multiplier=10;
+    size_t epsilonR=4;
 
     uint64_t ExtractInteger(const char* pos, size_t size) {
         char* temp = new char[size + 1];
