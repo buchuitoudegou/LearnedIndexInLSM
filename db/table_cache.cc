@@ -530,10 +530,10 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // ParsedInternalKey parsed_key;
       ParseInternalKey(k, &parsed_key);
       uint64_t block_offset = i * adgMod::block_size;
-      // if (filter != nullptr && !filter->KeyMayMatch(block_offset, k)) {
-      //   cache_->Release(cache_handle);
-      //   return;
-      // }
+      if (filter != nullptr && !filter->KeyMayMatch(block_offset, k)) {
+        cache_->Release(cache_handle);
+        return;
+      }
       // Get the interval within the data block that the target key may lie in
       size_t pos_block_lower = i == index_lower ? lower % adgMod::block_num_entries : 0;
       size_t pos_block_upper = i == index_upper ? upper % adgMod::block_num_entries : adgMod::block_num_entries - 1;
