@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
     bool change_level_load, change_file_load, change_level_learning, change_file_learning;
     int load_type, insert_bound, length_range;
     string db_location_copy;
-    int bpk, model_error;
+    double bpk, model_error;
     int dataset_no, workload_no, exp_no;
     string dataset_name;
     int compaction_policy,inputlen;
@@ -239,8 +239,8 @@ int main(int argc, char *argv[]) {
             ("w,write", "writedb", cxxopts::value<bool>(fresh_write)->default_value("false"))
             ("c,uncache", "evict cache", cxxopts::value<bool>(evict)->default_value("false"))
             ("u,unlimit_fd", "unlimit fd", cxxopts::value<bool>(unlimit_fd)->default_value("false"))
-            ("b,bpk", "bits per key", cxxopts::value<int>(bpk)->default_value("10"))
-            ("e,modelerror", "bits per key", cxxopts::value<int>(model_error)->default_value("8"))
+            ("b,bpk", "bits per key", cxxopts::value<double>(bpk)->default_value("10"))
+            ("e,modelerror", "bits per key", cxxopts::value<double>(model_error)->default_value("8"))
             ("x,dummy", "dummy option")
             ("l,load_type", "load type", cxxopts::value<int>(load_type)->default_value("0"))
             // ("filter", "use filter", cxxopts::value<bool>(adgMod::use_filter)->default_value("false"))

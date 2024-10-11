@@ -162,6 +162,7 @@ namespace adgMod {
     extern double findtable_time;
     extern double error_multiplier;
     extern double writeindexblock_time;
+    extern vector<std::pair<double,size_t>> level_prediction;
 
     // some util functions
     uint64_t ExtractInteger(const char* pos, size_t size);
