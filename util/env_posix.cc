@@ -205,6 +205,7 @@ class PosixRandomAccessFile final : public RandomAccessFile {
 
     Status status;
     // std::cout<<"n:"<<n<<" offset:"<<offset<<std::endl;
+    adgMod::n_IO+=n;
     ssize_t read_size = ::pread(fd, scratch, n, static_cast<off_t>(offset));
     if (read_size < 0) {
       // An error: return a non-ok status.

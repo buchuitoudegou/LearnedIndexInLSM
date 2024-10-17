@@ -115,6 +115,7 @@ namespace adgMod {
     int rmi_layer_size=1024;
     int lipp_gap=5;
     int alex_node_size = 1 << 11;
+    int epsilonR=4;
     int bisearch_depth=0;
     int compaction_count=0;
     int memcompaction_count=0;
@@ -131,7 +132,14 @@ namespace adgMod {
     double findtable_time=0;
     double error_multiplier=10;
     double writeindexblock_time=0;
+    double findfile_duration=0;
+    size_t n_IO=0;
+    double iter_seek_time=0;
     vector<pair<double,size_t>> level_prediction{{0,0},{0,0},{0,0},{0,0},{0,0},{0,0},{0,0}};
+    // dirty impl
+    // number of entries in each SST, key: file number
+    // used in learned interator
+    map<size_t,size_t> num_entry_map;
 
     uint64_t ExtractInteger(const char* pos, size_t size) {
         char* temp = new char[size + 1];

@@ -200,13 +200,12 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
   return iter;
 }
 
-Iterator* Table::NewIterator(const ReadOptions& options, int file_num, RandomAccessFile* file) const {
-  // std::cout<<"Generating Table iter: "<<file<<" "<<adgMod::MOD<<std::endl;
-  // if (file != nullptr && (adgMod::MOD == 6 || adgMod::MOD == 7)) {
-  //   adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(file_num);
-  //   // std::cout<<"Generating learned iter: "<<std::endl;
-  //   if (model->Learned()) return new LearnedIterator(const_cast<Table*>(this), file, model, file_num);
-  // }
+Iterator* Table::NewIterator(const ReadOptions& options, int file_num, RandomAccessFile* file, bool use_learned_index) const {
+  if (use_learned_index && file != nullptr && (adgMod::MOD == 6 || adgMod::MOD == 7)) 
+  {
+    adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(file_num);
+    if (model->Learned()) return new LearnedIterator(const_cast<Table*>(this), file, model, file_num);
+  }
   return NewTwoLevelIterator(
       rep_->index_block->NewIterator(rep_->options.comparator),
       &Table::BlockReader, const_cast<Table*>(this), options);

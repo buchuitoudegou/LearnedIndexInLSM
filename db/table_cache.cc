@@ -152,7 +152,10 @@ Iterator* TableCache::NewIterator(const ReadOptions& options,
 
   Table* table = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
   RandomAccessFile* file = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->file;
-  Iterator* result = table->NewIterator(options,file_number,file);
+  bool use_learned_index=true;
+  // if (level==0)
+  //   use_learned_index=false;
+  Iterator* result = table->NewIterator(options,file_number,file,use_learned_index);
   result->RegisterCleanup(&UnrefEntry, cache_, handle);
   if (tableptr != nullptr) {
     *tableptr = table;
@@ -530,10 +533,10 @@ void TableCache::LevelRead(const ReadOptions &options, uint64_t file_number,
       // ParsedInternalKey parsed_key;
       ParseInternalKey(k, &parsed_key);
       uint64_t block_offset = i * adgMod::block_size;
-      // if (filter != nullptr && !filter->KeyMayMatch(block_offset, k)) {
-      //   cache_->Release(cache_handle);
-      //   return;
-      // }
+      if (filter != nullptr && !filter->KeyMayMatch(block_offset, k)) {
+        cache_->Release(cache_handle);
+        return;
+      }
       // Get the interval within the data block that the target key may lie in
       size_t pos_block_lower = i == index_lower ? lower % adgMod::block_num_entries : 0;
       size_t pos_block_upper = i == index_upper ? upper % adgMod::block_num_entries : adgMod::block_num_entries - 1;

@@ -43,6 +43,7 @@ int buffer_size = 2*1024*1024;
 int T = 10;
 int num_levels = 5;
 double base_bpk = 0;
+int get_times = 0;
 
 leveldb::Options GetLevelingOptions() {
   leveldb::Options options;
@@ -103,7 +104,8 @@ leveldb::Options GetLazyLevelOptions() {
 double get_avg_LevelRead_duration()
 {
     if(LevelRead_counter)
-        return LevelRead_duration/LevelRead_counter;
+        // return LevelRead_duration/LevelRead_counter;
+        return LevelRead_duration/get_times;
     return 0;
 }
 double get_avg_prediction_duration()
@@ -111,8 +113,10 @@ double get_avg_prediction_duration()
     if(prediction_counter)
     {
         if(MOD==0)
-            return index_block_time/prediction_counter;
-        return prediction_duration/prediction_counter;
+            // return index_block_time/prediction_counter;
+            return index_block_time/get_times;
+        // return prediction_duration/prediction_counter;
+        return prediction_duration/get_times;
     }
         
     return 0;
@@ -122,17 +126,18 @@ double get_avg_bisearch_duration()
     if(bisearch_counter)
     {
         if(MOD==0)
-            return blockreader_bisearch_time/bisearch_counter;
-        return bisearch_duration/bisearch_counter;
+            // return blockreader_bisearch_time/bisearch_counter;
+            return blockreader_bisearch_time/get_times;
+        // return bisearch_duration/bisearch_counter;
+        return bisearch_duration/get_times;
     }
     return 0;
 }
 double get_avg_prediction_range()
 {
     if(bisearch_counter)
-    {
-        return prediction_range/bisearch_counter;
-    }
+        // return prediction_range/bisearch_counter;
+        return prediction_range/get_times;
     return 0;
 }
 
@@ -304,6 +309,7 @@ int main(int argc, char *argv[]) {
             ("lippgap","lipp gap", cxxopts::value<int>(adgMod::lipp_gap)->default_value("5"))
             ("alexnodesize","alex max node size",cxxopts::value<int>(adgMod::alex_node_size)->default_value("2048"))
             ("alexinterval", "alex*", cxxopts::value<int>(adgMod::alex_interval)->default_value("1"))
+            ("epsilonR", "epsilon recursive for PGM", cxxopts::value<int>(adgMod::epsilonR)->default_value("4"))
             ("lippmode", "lipp*", cxxopts::value<int>(adgMod::lipp_mode)->default_value("0"))
             ("dataset","name of dataset", cxxopts::value<string>(dataset_name)->default_value("Unknown"))
             // ("dataset","name of dataset", cxxopts::value<int>(dataset_no)->default_value("0"))
@@ -568,7 +574,7 @@ int main(int argc, char *argv[]) {
             cout << "Repoened" << endl;
             int read_times = 0;
             int write_times = 0;
-            int get_times = 0;
+            std::srand(std::time(nullptr));
             vector<double> results;
             for(int j=0; j<1; j++){
                 // cout<<"In multi read"<<endl;
@@ -588,6 +594,10 @@ int main(int argc, char *argv[]) {
                     }
                     get_times++;
                     string option = keys_read[i].first;
+                    if(rand()%20==0)
+                        option = "UPDATE";
+                    else
+                        option = "SCAN";
                     if(option == "READ"){
                         // cout<<"Reading!"<<endl;
                         auto start_timer=std::chrono::steady_clock::now();
@@ -620,8 +630,9 @@ int main(int argc, char *argv[]) {
                     else if(option == "SCAN"){
                         // std::cout<<"scaning"<<std::endl;
                         Iterator* db_iter = length_range == 0 ? nullptr : db->NewIterator(read_options);
+                        auto start_timer=std::chrono::steady_clock::now();
                         db_iter->Seek(keys_read[i].second);
-                        
+                        adgMod::iter_seek_time+=std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start_timer).count();
                         // Range
                         for (int r = 0; r < length_range; ++r) {
                             if (!db_iter->Valid()) break;
@@ -693,7 +704,7 @@ int main(int argc, char *argv[]) {
             // string workloadname = WorkloadMap[workload_no];
             string expname = ExpMap[exp_no];
 
-            string exptag = modelname + "_" + dataset_name + "_" + std::to_string(length_range)+"_"+std::to_string(model_error);
+            string exptag = modelname + "_" + dataset_name + "_" + std::to_string(length_range)+"_"+std::to_string(int(model_error));
 
             std::fstream res;
             res.setf(std::ios::fixed,std::ios::floatfield);
@@ -735,19 +746,22 @@ int main(int argc, char *argv[]) {
                 << 1.0*bisearch_depth/bisearch_counter << "\t"
                 << IO_duration/bisearch_counter << endl;
 
+            // res<<n_IO<<endl;
+            // res<<iter_seek_time<<endl;
+            // res<<findfile_duration/prediction_counter<<endl;
             // res << index_block_time << " " << blockreader_create_time << " "
             //     << blockreader_bisearch_time << " "<< IO_duration/bisearch_counter << endl;
             // cout << index_block_time << " " << blockreader_create_time << " "
             //     << blockreader_bisearch_time << " "<< IO_duration/bisearch_counter << endl;
             // res << findtable_time/ read_times <<endl;
-            if (MOD==0)
-                for (int i=0;i<7;++i)
-                    res<<block_size*level_prediction[i].second<<" ";
-            else
-                for (int i=0;i<7;++i)
-                    res<<level_prediction[i].first<<" ";
+            // if (MOD==0)
+            //     for (int i=0;i<7;++i)
+            //         res<<block_size*level_prediction[i].second<<" ";
+            // else
+            //     for (int i=0;i<7;++i)
+            //         res<<level_prediction[i].first<<" ";
             
-            res<<endl;
+            // res<<endl;
             delete db;
         }
     }

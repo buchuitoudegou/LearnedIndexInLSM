@@ -637,6 +637,7 @@ int DBImpl::CompactMemTable() {
     for (auto& new_file : edit.new_files_) {
       adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(new_file.second.number);
       model->LearnFileNew(keys, 0);
+      adgMod::num_entry_map.insert(make_pair(new_file.second.number,keys.size()));
       model->WriteLearnedModelNew(dbname_ + "/" + to_string(new_file.second.number) + ".fmodel");
     }
   }
@@ -1048,6 +1049,7 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
     assert(keys != nullptr);
     adgMod::LearnedIndexData* model = adgMod::file_data->GetModel(meta->number);
     model->LearnFileNew(*keys, level);
+    adgMod::num_entry_map.insert(make_pair(meta->number,keys->size()));
     model->WriteLearnedModelNew(dbname_ + "/" + to_string(meta->number) + ".fmodel");
     adgMod::newSST_count++;
   }

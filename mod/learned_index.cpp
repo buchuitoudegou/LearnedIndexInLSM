@@ -451,6 +451,7 @@ uint64_t LearnedIndexData::FileLearn(void* arg) {
   if (self->FillData(c, mas->meta)) {
     self->LearnFileNew(self->keys, self->level);
     self->WriteLearnedModelNew(adgMod::db_name+"/"+std::to_string(meta->number)+".fmodel");
+    adgMod::num_entry_map.insert(make_pair(meta->number,self->keys.size()));
     entered = true;
   } else {
     // std::cout<<"Data NOT Filled"<<std::endl;
@@ -1165,6 +1166,8 @@ void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys, int level
   auto start = std::chrono::steady_clock::now();
   auto level_error = error;
   for (int i = 0; i < level; i++) level_error *= error_multiplier;
+  real_num_entries = keys.size();
+  size=keys.size();
   if (adgMod::modelmode == 0) {
     // PLR
     PLR plr = PLR(error);
@@ -1196,7 +1199,7 @@ void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys, int level
   }
   else if (adgMod::modelmode == 3) {
     // pgm
-    pgm::PGMIndex<uint64_t> index(keys.begin(), keys.end(),error,4);
+    pgm::PGMIndex<uint64_t> index(keys.begin(), keys.end(),error,adgMod::epsilonR);
     pgm = index;
   }
   else if (adgMod::modelmode == 4)
@@ -1229,18 +1232,28 @@ void LearnedIndexData::WriteLearnedModelNew(const std::string& filename) {
   if (adgMod::modelmode == 0) {
     // PLR
     std::ofstream output_file(filename, std::ios::binary);
-    output_file.precision(40);
-    // 1. min key
-    output_file << min_key << std::endl;
-    // 2. max key
-    output_file << max_key << std::endl;
-    // 3. size
-    output_file << size << std::endl;
-    // 4. segments
-    output_file << string_segments.size() << std::endl;
+    output_file.write(reinterpret_cast<const char*>(&min_key), sizeof(min_key));
+    output_file.write(reinterpret_cast<const char*>(&max_key), sizeof(max_key));
+    output_file.write(reinterpret_cast<const char*>(&size), sizeof(size));
+    int seg_size = string_segments.size();
+    output_file.write(reinterpret_cast<const char*>(&seg_size), sizeof(seg_size));
     for (auto& segment : string_segments) {
-      output_file << segment.x << " " << segment.k << " " << segment.b << std::endl;
+      output_file.write(reinterpret_cast<const char*>(&segment.x), sizeof(segment.x));
+      output_file.write(reinterpret_cast<const char*>(&segment.k), sizeof(segment.k));
+      output_file.write(reinterpret_cast<const char*>(&segment.b), sizeof(segment.b));
     }
+    // output_file.precision(40);
+    // // 1. min key
+    // output_file << min_key << std::endl;
+    // // 2. max key
+    // output_file << max_key << std::endl;
+    // // 3. size
+    // output_file << size << std::endl;
+    // // 4. segments
+    // output_file << string_segments.size() << std::endl;
+    // for (auto& segment : string_segments) {
+    //   output_file << segment.x << " " << segment.k << " " << segment.b << std::endl;
+    // }
   }
   if (adgMod::modelmode == 2)
   {
@@ -1303,15 +1316,28 @@ void LearnedIndexData::LoadLearnedModelNew(const std::string& filename) {
     std::ifstream input_file(filename, std::ios::binary);
     if (!input_file.good()) return;
     // load members
-    input_file >> min_key;
-    input_file >> max_key;
-    input_file >> size;
+    // input_file >> min_key;
+    // input_file >> max_key;
+    // input_file >> size;
+    // int seg_size = 0;
+    // input_file >> seg_size;
+    // for (int i = 0; i < seg_size; ++i) {
+    //   uint64_t x;
+    //   double k, b;
+    //   input_file >> x >> k >> b;
+    //   string_segments.emplace_back(x, k, b);
+    // }
+    input_file.read(reinterpret_cast<char*>(&min_key), sizeof(min_key));
+    input_file.read(reinterpret_cast<char*>(&max_key), sizeof(max_key));
+    input_file.read(reinterpret_cast<char*>(&size), sizeof(size));
     int seg_size = 0;
-    input_file >> seg_size;
+    input_file.read(reinterpret_cast<char*>(&seg_size), sizeof(seg_size));
     for (int i = 0; i < seg_size; ++i) {
       uint64_t x;
       double k, b;
-      input_file >> x >> k >> b;
+      input_file.read(reinterpret_cast<char*>(&x), sizeof(x));
+      input_file.read(reinterpret_cast<char*>(&k), sizeof(k));
+      input_file.read(reinterpret_cast<char*>(&b), sizeof(b));
       string_segments.emplace_back(x, k, b);
     }
     input_file.close();

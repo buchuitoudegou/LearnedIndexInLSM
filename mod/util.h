@@ -144,6 +144,7 @@ namespace adgMod {
     extern int rmi_layer_size;
     extern int lipp_gap;
     extern int alex_node_size;
+    extern int epsilonR;
     extern int bisearch_depth;
     extern int compaction_count;
     extern int memcompaction_count;
@@ -163,6 +164,10 @@ namespace adgMod {
     extern double error_multiplier;
     extern double writeindexblock_time;
     extern vector<std::pair<double,size_t>> level_prediction;
+    extern map<size_t,size_t> num_entry_map;
+    extern double findfile_duration;
+    extern size_t n_IO;
+    extern double iter_seek_time;
 
     // some util functions
     uint64_t ExtractInteger(const char* pos, size_t size);

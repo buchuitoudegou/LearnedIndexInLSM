@@ -475,7 +475,9 @@ namespace leveldb {
                         // if no models available follow the baseline path
                         adgMod::levelled_counters[14].Increment(level);
                         // Binary search to find earliest index whose largest key >= ikey.
+                        auto beforeTime = std::chrono::steady_clock::now();
                         uint32_t index = FindFile(vset_->icmp_, files_[level], ikey);
+                        adgMod::findfile_duration += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - beforeTime).count();
                         if (index >= num_files) {
                             files = nullptr;
                             num_files = 0;
