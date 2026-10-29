@@ -91,7 +91,13 @@ public:
         auto error_value = Error;
         size_t num_segments;
 
-        auto in_fun = [this, first](auto i) { return pair_type(first[i], i); };
+        // As PGM-index: at the end of a run of repeats of x with x + 1 below the next key, use x + 1, so that the
+        // absent keys between the run and the next key are mapped to the run's end, not to its start.
+        auto in_fun = [this, first](auto i) {
+            auto x = first[i];
+            auto flag = i > 0 && i + 1u < n && x == first[i - 1] && x != first[i + 1] && x + 1 != first[i + 1];
+            return pair_type(x + flag, i);
+        };
         auto out_fun = [this](auto segment) { segments.emplace_back(segment); };
         num_segments = get_all_segments(n, error_value, in_fun, out_fun);
 
@@ -124,11 +130,21 @@ public:
             KeyType start_key = it.data().get_start_key();
             auto [slope, intercept] = it.data().get_slope_intercept();
             auto pos = (key - start_key) * slope + intercept;
+            // Absent keys after this segment's last key: cap the extrapolation at the next segment's first position
+            // (as PGM-index does). The tree is ordered by std::greater, so the next segment comes before `it`.
+            if (it != fiting_tree.begin())
+            {
+                auto next = it;
+                --next;
+                long double next_pos = next.data().get_slope_intercept().second;
+                if (pos > next_pos)
+                    pos = next_pos;
+            }
 
             if (pos - Error > n)
                 return {n - 1, n, n - 1};
 
-            uint64_t hi = ADD_ERR(pos, Error, n);
+            uint64_t hi = ADD_ERR(pos, Error + 1, n); // + 1: an absent key's answer is one past the key before it
             uint64_t lo = SUB_ERR(pos, Error);
             return {(uint64_t)pos, hi, lo};
         }

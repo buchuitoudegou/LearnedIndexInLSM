@@ -79,6 +79,8 @@ GreedyPLR::process(const struct point& pt, bool file, int key_tag) {
 
     struct point pt_;
     pt_ = pt;
+    if (this->state.compare("need2") == 0) this->origin = pt_.x;
+    pt_.x -= this->origin;
 
 
     // std::cout<<std::setprecision(1)<<"Point coming:"<<pt_.x<<" "<<pt_.y<<" "<<key_tag<<" "<<this->state<<std::endl;
@@ -151,7 +153,7 @@ GreedyPLR::setup(bool file) {
 
 Segment
 GreedyPLR::current_segment() {
-    uint64_t segment_start = this->s0.x;
+    uint64_t segment_start = this->origin + this->s0.x;
     double avg_slope = (this->rho_lower.a + this->rho_upper.a) / 2.0;
     if (avg_slope<0){
         avg_slope = 0;
@@ -163,11 +165,12 @@ GreedyPLR::current_segment() {
 }
 
 Segment
-GreedyPLR::process__(struct point pt, bool file, int key_tag) {
+GreedyPLR::process__(struct point& pt, bool file, int key_tag) {
 
     if (!(is_above(pt, this->rho_lower) && is_below(pt, this->rho_upper))) {
         Segment prev_segment = current_segment();
         if (!file && (u_int32_t) pt.y % 2 == 1) {
+            this->origin += last_pt.x; pt.x -= last_pt.x; last_pt.x = 0;  // new segment starts at last_pt
           // current point is the largest point in the segments
             this->s0 = last_pt;
             this->tag0 = lasttag;
@@ -178,11 +181,13 @@ GreedyPLR::process__(struct point pt, bool file, int key_tag) {
             return prev_segment;
         } else {
             if(key_tag == 1 || key_tag == 0){
+                this->origin += pt.x; pt.x = 0;  // new segment starts at pt
                 this->s0 = pt;
                 this->tag0 = key_tag;
                 this->state = "need1";
             }
             if(key_tag == 2){
+                this->origin += last_pt.x; pt.x -= last_pt.x; last_pt.x = 0;  // new segment starts at last_pt
                 this->s0 = last_pt;
                 this->tag0 = lasttag;
                 this->s1 = pt;
@@ -237,7 +242,7 @@ GreedyPLR::finish() {
         return s;
     } else if (this->state.compare("need1") == 0) {
         this->state = "finished";
-        s.x = this->s0.x;
+        s.x = this->origin + this->s0.x;
         s.k = 0;
         s.b = this->s0.y;
         return s;
@@ -259,12 +264,27 @@ PLR::train(std::vector<std::pair<string,int>>& keys, bool file) {
     GreedyPLR plr(this->gamma);
     int count = 0;
     size_t size = keys.size();
+    // Fit the lines on key - base, not on the absolute key: with 16-digit keys the intercepts cancel in double (and
+    // keys above 2^53 are not distinct as doubles). base is one below the first key, so that no segment starts at
+    // x = 0, which the checks below read as "no segment". Segment.x is made absolute again; GetPosition subtracts it.
+    const uint64_t base = size ? stoull(keys[0].first) - 1 : 0;
     for (int i = 0; i < size; ++i) {
-        
-        Segment seg = plr.process(point((double) stoull(keys[i].first), i), file, keys[i].second);
+        // File models (an L0 file can hold several versions of a key): train on the first occurrence only, which is
+        // where lower_bound lands, and after a run of repeats add (key + 1, i) so that absent keys between the run and
+        // the next key map to position i (as RadixSpline's fix and PGM-index do).
+        if (file && i > 0 && keys[i].first == keys[i - 1].first) continue;
+        if (file && i > 1 && keys[i - 1].first == keys[i - 2].first) {
+            uint64_t next_x = stoull(keys[i - 1].first) + 1;
+            if (next_x < stoull(keys[i].first)) {
+                Segment seg = plr.process(point((double) (next_x - base), i), file, 0);
+                if (seg.x != 0 || seg.k != 0 || seg.b != 0) { seg.x += base; this->segments.push_back(seg); }
+            }
+        }
+        Segment seg = plr.process(point((double) (stoull(keys[i].first) - base), i), file, keys[i].second);
         if (seg.x != 0 ||
             seg.k != 0 ||
             seg.b != 0) {
+            seg.x += base;
             this->segments.push_back(seg);
         }
 
@@ -278,6 +298,7 @@ PLR::train(std::vector<std::pair<string,int>>& keys, bool file) {
     if (last.x != 0 ||
         last.k != 0 ||
         last.b != 0) {
+        last.x += base;
         this->segments.push_back(last);
     }
 

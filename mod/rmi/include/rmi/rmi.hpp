@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <limits>
 
 #define writeprecision 20
 
@@ -414,6 +415,32 @@ class RmiLAbs : public Rmi<Key, Layer1, Layer2>
                 errors_[segment_id] = std::max(errors_[segment_id], pred - i);
             } else { // underestimation
                 errors_[segment_id] = std::max(errors_[segment_id], i - pred);
+            }
+        }
+        // Absent keys: layer1 also sends keys that are not in the data to each model, beyond the model's first and
+        // last training key (or to a model with no training key), where the line is extrapolated. The estimate is
+        // monotone within a model, so the worst such keys are the smallest and the largest key layer1 sends to it.
+        for (std::size_t j = 0; j < layer2_size; ++j) {
+            for (int side = 0; side < 2; ++side) {
+                key_type lo = 0, hi = std::numeric_limits<key_type>::max();
+                if (side == 0) { // smallest key with segment id >= j
+                    if (base_type::get_segment_id(hi) < j) continue;
+                    while (lo < hi) {
+                        key_type mid = lo + (hi - lo) / 2;
+                        if (base_type::get_segment_id(mid) >= j) hi = mid; else lo = mid + 1;
+                    }
+                } else { // largest key with segment id <= j
+                    if (base_type::get_segment_id(lo) > j) continue;
+                    while (lo < hi) {
+                        key_type mid = lo + (hi - lo) / 2 + 1;
+                        if (base_type::get_segment_id(mid) <= j) lo = mid; else hi = mid - 1;
+                    }
+                }
+                if (base_type::get_segment_id(lo) != j) continue;
+                std::size_t L = std::lower_bound(first, last, lo) - first; // the correct answer for key lo
+                std::size_t pred = std::clamp<double>(base_type::l2_[j].predict(lo), 0, base_type::n_keys_ - 1);
+                if (pred > L) errors_[j] = std::max(errors_[j], pred - L);
+                else if (L > pred + 1) errors_[j] = std::max(errors_[j], L - pred - 1); // hi = pred + err + 1
             }
         }
     }

@@ -33,7 +33,8 @@ std::pair<uint64_t, uint64_t> LearnedIndexData::GetPosition(
   // check if the key is within the model bounds
   uint64_t target_int = SliceToInteger(target_x);
   if (target_int > max_key) return std::make_pair(size, size);
-  if (target_int < min_key) return std::make_pair(size, size);
+  // Below the first key the answer is position 0 (Seek); (size, size) made the iterator skip the whole file.
+  if (target_int < min_key) return std::make_pair(0, 0);
 
   // binary search between segments
   uint32_t left = 0, right = (uint32_t)string_segments.size() - 1;
@@ -49,11 +50,11 @@ std::pair<uint64_t, uint64_t> LearnedIndexData::GetPosition(
   // calculate the interval according to the selected segment
   uint64_t lower, upper;
   if(adgMod::nofence == 1){
-    double result = target_int * string_segments[left].k + string_segments[left].b;
+    double result = (target_int - string_segments[left].x) * string_segments[left].k + string_segments[left].b;
     lower = result;
     upper = lower;
     if(is_level){
-      double result = target_int * string_segments[left].k + string_segments[left].b;
+      double result = (target_int - string_segments[left].x) * string_segments[left].k + string_segments[left].b;
       result = is_level ? result / 2 : result;
       lower =
           result - error > 0 ? (uint64_t)std::floor(result - error) : 0;
@@ -63,7 +64,7 @@ std::pair<uint64_t, uint64_t> LearnedIndexData::GetPosition(
     }
   }
   else if((adgMod::nofence == 2)){
-    double result = target_int * string_segments[left].k + string_segments[left].b;
+    double result = (target_int - string_segments[left].x) * string_segments[left].k + string_segments[left].b;
       result = is_level ? result / 2 : result;
       lower =
           result -  adgMod::block_num_entries - error > 0 ? (uint64_t)std::floor(result - adgMod::block_num_entries - error) : 0;
@@ -72,11 +73,18 @@ std::pair<uint64_t, uint64_t> LearnedIndexData::GetPosition(
       upper = upper < size ? upper : size - 1;
   }
   else{
-      double result = target_int * string_segments[left].k + string_segments[left].b;
+      double result = (target_int - string_segments[left].x) * string_segments[left].k + string_segments[left].b;
+      // Absent keys after the last key of this segment: cap the extrapolated estimate by the next segment's estimate
+      // of its own first key, which is its b (the dummy last segment has none).
+      if (left + 2 < string_segments.size()) {
+        double next_start = string_segments[left + 1].b;
+        if (result > next_start) result = next_start;
+      }
       result = is_level ? result / 2 : result;
       lower =
           result - error > 0 ? (uint64_t)std::floor(result - error) : 0;
-      upper = (uint64_t)std::ceil(result + error);
+      // + 1: the first key not smaller than an absent key is one past the key before it
+      upper = (uint64_t)std::ceil(result + error) + 1;
       if (lower >= size) return std::make_pair(size, size);
       upper = upper < size ? upper : size - 1;
   }
@@ -1175,15 +1183,11 @@ void LearnedIndexData::LearnFileNew(const std::vector<uint64_t>& keys, int level
     min_key = keys.front();
     max_key = temp;
     size = keys.size();
-    uint64_t last_key = 0;
+    // Keys are passed unchanged: PLR::train skips repeated keys itself (replacing a repeat by "previous + 1" turned
+    // 5, 5, 5 into 5, 6, 5 and moved the first occurrence that Get looks for).
     auto cur_keys = keys;
     std::vector<std::pair<std::string, int>> skeys;
     for (size_t i = 0; i < cur_keys.size(); ++i) {
-      long long thiskey = cur_keys[i];
-      if (i > 0 && last_key == thiskey) {
-        cur_keys[i] = last_key + 1;
-      }
-      last_key = cur_keys[i];
       int is_first = i == 0;
       skeys.push_back({std::to_string(cur_keys[i]), is_first});
     }

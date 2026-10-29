@@ -49,10 +49,13 @@ private:
     struct line rho_lower;
     struct line rho_upper;
     struct point sint;
+    // x of the current segment's first point: points are stored relative to it, so the line's b is its value at the
+    // segment's first key (absolute 16-digit keys made the cone and intercept computations cancel in double).
+    double origin = 0;
 
     void setup(bool file);
     Segment current_segment();
-    Segment process__(struct point pt, bool file, int key_tag);
+    Segment process__(struct point& pt, bool file, int key_tag);
 
 public:
     GreedyPLR(double gamma);

@@ -16,7 +16,7 @@ class LearnedIterator : public Iterator {
     block_content(), current_block(-1), current_entry(-1), key_(), value_() { };
 
   virtual ~LearnedIterator() {
-    delete[] scratch;
+    // scratch is a member array (below), not heap memory: delete[] aborted with "free(): invalid pointer"
   }
 
   virtual void Seek(const Slice& target) {
@@ -93,17 +93,19 @@ class LearnedIterator : public Iterator {
     size_t index_lower = lower / adgMod::block_num_entries;
     size_t index_upper = upper / adgMod::block_num_entries;
 
-    uint64_t i = index_lower;
-    if (index_lower != index_upper) {
-      Block* index_block = table->rep_->index_block;
-      uint32_t mid_index_entry = DecodeFixed32(index_block->data_ + index_block->restart_offset_ + index_lower * sizeof(uint32_t));
+    // Binary search over all blocks the window touches (as InternalGet does in db/table_cache.cc); the window can
+    // span more than two blocks when the error bound is larger than a block.
+    uint64_t i = index_lower, j = index_upper;
+    Block* index_block = table->rep_->index_block;
+    while (i < j) {
+      uint64_t mid = (i + j) / 2;
+      uint32_t mid_index_entry = DecodeFixed32(index_block->data_ + index_block->restart_offset_ + mid * sizeof(uint32_t));
       uint32_t shared, non_shared, value_length;
       const char* key_ptr = DecodeEntry(index_block->data_ + mid_index_entry,
                                         index_block->data_ + index_block->restart_offset_, &shared, &non_shared, &value_length);
       assert(key_ptr != nullptr && shared == 0 && "Index Entry Corruption");
       Slice mid_key(key_ptr, non_shared);
-      int comp = table->rep_->options.comparator->Compare(mid_key, target);
-      i = comp < 0 ? index_upper : index_lower;
+      if (table->rep_->options.comparator->Compare(mid_key, target) < 0) i = mid + 1; else j = mid;
     }
     // No filter block search, just read corresponding entries
     size_t pos_block_lower = i == index_lower ? lower % adgMod::block_num_entries : 0;
@@ -124,7 +126,8 @@ class LearnedIterator : public Iterator {
     while (left < right) {
       uint32_t mid = (left + right) / 2;
       uint32_t shared, non_shared, value_length;
-      const char* key_ptr = DecodeEntry(block_content.data() + (left - pos_block_lower) * adgMod::entry_size,
+      // read entry `mid` (the original read `left`, which skipped keys)
+      const char* key_ptr = DecodeEntry(block_content.data() + (mid - pos_block_lower) * adgMod::entry_size,
               block_content.data() + (pos_block_upper - pos_block_lower + 1)*adgMod::entry_size, &shared, &non_shared, &value_length);
       assert(key_ptr != nullptr && shared == 0 && "Entry Corruption");
       Slice mid_key(key_ptr, non_shared);
@@ -141,6 +144,9 @@ class LearnedIterator : public Iterator {
     current_entry = left;
     pos_block_content = left-pos_block_lower;
     ParseEntry();
+    // Every key in the window is smaller than the target, e.g. the target is larger than this file's last key (L0 files
+    // see every Seek): step forward; Next() invalidates the iterator at the end of the file.
+    while (Valid() && table->rep_->options.comparator->Compare(key_, target) < 0) Next();
 	}
 
   virtual void SeekToFirst() { 
